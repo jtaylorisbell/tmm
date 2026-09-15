@@ -483,10 +483,10 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
     <div class="crt-glow"></div>
     <div class="pixel-landscape" data-landscape></div>
     <div class="slide-content" style="justify-content: center; align-items: center; text-align: center;">
-        <div class="reveal r1" style="margin-bottom: 32px;"><span class="label-pill">Data + AI Summit 2026 · Lab Companion</span></div>
+        <div class="reveal r1" style="margin-bottom: 32px;"><span class="label-pill">Built for General Motors · Lab Companion</span></div>
         <h1 class="pixel-hero reveal r2" style="margin-bottom: 16px;">FROM PROMPT<br>TO PRODUCTION</h1>
         <p class="hero-tagline reveal r3" style="max-width: 880px; margin-bottom: 40px;">
-            Over the next 90 minutes you'll build a custom AI agent on
+            Over the next 40 minutes you'll build a custom AI GM dealer service assistant on
             <strong style="color: var(--neon-cyan);">Databricks Apps</strong>, govern it with your own
             identity, break it on planted data bugs, measure the damage with LLM judges, fix it —
             and prove the fix with numbers. Keep this open as your field guide.
@@ -494,7 +494,7 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
         <div class="reveal r4" style="display: flex; gap: 16px; justify-content: center;">
             <a class="hero-badge" href="https://docs.databricks.com/aws/en/dev-tools/databricks-apps/auth" target="_blank" rel="noopener">All-OBO</a>
             <a class="hero-badge" href="https://docs.databricks.com/aws/en/genie-code/" target="_blank" rel="noopener">Genie Code</a>
-            <a class="hero-badge" href="https://openai.github.io/openai-agents-python/" target="_blank" rel="noopener">OpenAI Agents SDK</a>
+            <a class="hero-badge" href="https://docs.databricks.com/aws/en/ai-gateway" target="_blank" rel="noopener">Unity AI Gateway</a>
             <a class="hero-badge" href="https://mlflow.org/genai" target="_blank" rel="noopener">MLflow Judges</a>
         </div>
     </div>
@@ -506,11 +506,11 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
 <section class="slide surface-lavender">
     <div class="slide-content" style="justify-content: center;">
         <div class="reveal r1" style="margin-bottom: 20px;"><span class="label-pill">The Mission</span></div>
-        <h2 class="headline reveal r2" style="margin-bottom: 16px;">Your 90 minutes at TechMart</h2>
+        <h2 class="headline reveal r2" style="margin-bottom: 16px;">Your 40 minutes at GM</h2>
         <p class="body-text reveal r3" style="max-width: 1100px; margin-bottom: 56px;">
-            You're a data engineer at a fictional electronics retailer, standing up a customer-support
-            agent against governed Unity Catalog data. Not a toy: a deployed app, with real auth, real
-            governance, real failure modes — and a measurement harness to keep it honest. Six beats:
+            You're a data engineer at General Motors, standing up a dealer service assistant against
+            governed Unity Catalog data. Not a toy: a deployed app, with real auth, real governance,
+            real failure modes — and a measurement harness to keep it honest. Six beats:
         </p>
         <div class="loop-row reveal r4">
             <div class="loop-step"><div class="loop-node"></div><div class="loop-rail"></div>
@@ -519,11 +519,11 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
             </div>
             <div class="loop-step"><div class="loop-node"></div><div class="loop-rail"></div>
                 <div class="subhead" style="margin-bottom: 8px;">GOVERN</div>
-                <p class="body-text" style="font-size: 15px;">Every data call runs on-behalf-of <em>you</em> — PII masks follow your identity</p><!-- memory is NOT OBO (golden path: app SP + Lakebase resource) — keep this beat about DATA calls only -->
+                <p class="body-text" style="font-size: 15px;">Data calls run on-behalf-of <em>you</em> (PII masks follow you); the model call runs behind Unity AI Gateway</p><!-- data path = OBO + UC mask; model path = Unity AI Gateway. Memory is NOT OBO (app SP + Lakebase resource). -->
             </div>
             <div class="loop-step hot"><div class="loop-node"></div><div class="loop-rail"></div>
                 <div class="subhead" style="margin-bottom: 8px;">BREAK</div>
-                <p class="body-text" style="font-size: 15px;">Your agent will confidently repeat lies planted in the marketing data</p>
+                <p class="body-text" style="font-size: 15px;">Your agent will confidently repeat lies planted in the vehicle brochures</p>
             </div>
             <div class="loop-step"><div class="loop-node"></div><div class="loop-rail"></div>
                 <div class="subhead" style="margin-bottom: 8px;">MEASURE</div>
@@ -563,8 +563,8 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
                 <p class="body-text" style="font-size: 15px;">A <strong style="color:var(--white);">Lakebase resource</strong> attached at deploy: every chat turn lands in managed Postgres, written by the app's own SP into a schema <em>it owns</em> (<span style="font-family: var(--font-hud); font-size: 13px;">memory_&lt;your-app&gt;</span>) — the documented production pattern.</p>
             </div>
             <div class="dark-card bracketed yellow" style="padding: 24px 20px;">
-                <div class="subhead" style="color: var(--neon-yellow); margin-bottom: 12px;">THE LLM</div>
-                <p class="body-text" style="font-size: 15px;">Foundation Model APIs, pay-per-token — the app's only service-principal call, and it needs no grant. Swap models with one line in <span style="font-family: var(--font-hud); font-size: 13px;">app.yaml</span>.</p>
+                <div class="subhead" style="color: var(--neon-yellow); margin-bottom: 12px;">THE LLM — AI GATEWAY</div>
+                <p class="body-text" style="font-size: 15px;">Foundation Model APIs, pay-per-token — the app's only service-principal call. Its endpoint is governed by <strong style="color:var(--white);">Unity AI Gateway</strong>: guardrails (PII + safety), payload logging, usage &amp; rate limits. Swap models with one line in <span style="font-family: var(--font-hud); font-size: 13px;">app.yaml</span>.</p>
             </div>
         </div>
         <div class="reveal r4" style="display: flex; align-items: center; gap: 40px;">
@@ -573,7 +573,7 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
                 <div class="eyebrow" style="color: var(--neon-pink); font-size: 12px;">Grants on the shared data</div>
             </div>
             <p class="body-text" style="max-width: 900px;">
-                On TechMart data there is no service account to over-permission, audit, or leak. If <em>you</em>
+                On GM data there is no service account to over-permission, audit, or leak. If <em>you</em>
                 can't see a row, neither can your agent. The only thing the app owns is its own memory schema —
                 created and owned by its SP. The security constraint <em>is</em> the architecture, and
                 it's why everyone in this room, with zero admin rights, ships their own app today.
@@ -600,9 +600,9 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
             </div>
             <div class="feature-card bracketed navy reveal r4" style="padding: 24px 22px;">
                 <div class="subhead" style="margin-bottom: 14px;">2 · THE REDACTION MOMENT</div>
-                <p class="body-text" style="font-size: 16px;">Then ask it: "What's the status of order
-                <span style="font-family: var(--font-hud); font-size: 14px;">ORD-10001</span>? Include the customer's email."
-                The order comes back — the PII comes back
+                <p class="body-text" style="font-size: 16px;">Then ask it: "What's the status of repair order
+                <span style="font-family: var(--font-hud); font-size: 14px;">RO-10001</span>? Include the customer's email."
+                The repair order comes back — the PII comes back
                 <span style="font-family: var(--font-hud); font-size: 14px;">***REDACTED***</span>. The same Unity Catalog
                 column mask you saw in the notebook fires through your deployed agent.</p>
             </div>
@@ -617,8 +617,9 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
         <div class="reveal r6" style="margin-top: 40px; max-width: 1100px;">
             <div class="quote-line" style="margin-bottom: 20px;"></div>
             <p class="body-text" style="font-family: var(--font-body); font-size: 24px; font-weight: 500; line-height: 1.7; color: var(--deep-navy);">
-                Nobody wrote redaction logic in the app. The mask was defined once, in the catalog —
-                governance you didn't have to build.
+                Nobody wrote redaction logic in the app. The mask was defined once, in the catalog — and
+                the model call runs behind Unity AI Gateway. Data path and model path, both governed in
+                Unity Catalog — governance you didn't have to build.
             </p>
         </div>
     </div>
@@ -639,28 +640,28 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
             <div class="feature-card bracketed navy">
                 <div class="eyebrow" style="color: var(--deep-navy); margin-bottom: 12px; font-size: 12px;">BUG 01 · AVAILABILITY</div>
                 <div class="subhead" style="margin-bottom: 12px;">Discontinued, still marketed</div>
-                <p class="body-text" style="font-size: 16px;">Somewhere, marketing docs pitch a product as "available for
-                immediate purchase" that the catalog says is <strong>Discontinued</strong>. A good agent trusts the catalog.
-                Try asking about products you saw in Module 1.</p>
+                <p class="body-text" style="font-size: 16px;">A brochure pitches the <strong>Chevrolet Camaro</strong> as "available to
+                order today" that the catalog says is <strong>Discontinued</strong>. A good agent trusts the catalog.
+                Try asking about models you saw in Module 1.</p>
             </div>
             <div class="feature-card bracketed navy">
                 <div class="eyebrow" style="color: var(--deep-navy); margin-bottom: 12px; font-size: 12px;">BUG 02 · WARRANTY ★</div>
                 <div class="subhead" style="margin-bottom: 12px;">The warranty lie</div>
                 <p class="body-text" style="font-size: 16px;">Every structured source agrees on the warranty term — the catalog
-                column, the official policy. Only the free-text <em>marketing copy</em> brags about something longer.
-                Ask your agent about a warranty and watch which source it trusts.</p>
+                column, the official policy (3 yr / 36,000 mi). Only the Cadillac <em>brochure copy</em> brags about 6 years.
+                Ask your agent about the Escalade warranty and watch which source it trusts.</p>
             </div>
             <div class="feature-card bracketed navy">
                 <div class="eyebrow" style="color: var(--deep-navy); margin-bottom: 12px; font-size: 12px;">BUG 03 · POLICY</div>
                 <div class="subhead" style="margin-bottom: 12px;">The too-nice policy doc</div>
-                <p class="body-text" style="font-size: 16px;">An over-permissive "Customer Satisfaction Policy (Extended)" lives in the
+                <p class="body-text" style="font-size: 16px;">An over-permissive "Customer Loyalty Service Policy (Extended)" lives in the
                 policy <em>table itself</em>. No prompt fixes bad data — this one's for your data engineers.</p>
             </div>
         </div>
         <div class="reveal r5" style="margin-top: 40px;">
             <div class="quote-line" style="margin-bottom: 20px;"></div>
             <p class="body-text" style="font-size: 24px; font-weight: 500; color: var(--deep-navy);">
-                Spoiler for Module 4: your structured data is right — your agent reads the marketing copy.
+                Spoiler for Module 4: your structured data is right — your agent reads the brochure copy.
             </p>
         </div>
     </div>
@@ -704,8 +705,8 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
         </div>
         <p class="body-text reveal r5" style="max-width: 1150px; margin-top: 28px;">
             The fix is a <strong style="color: var(--white);">prompt change</strong> — warranty questions must ground in
-            <span style="font-family: var(--font-hud); font-size: 14px;">get_return_policy('warranty')</span>. And when you see the
-            yellow dip, that's the <em>lesson</em>, not a bug: the returns-policy row fails on
+            <span style="font-family: var(--font-hud); font-size: 14px;">get_warranty_policy('warranty')</span>. And when you see the
+            yellow dip, that's the <em>lesson</em>, not a bug: the loyalty-service-policy row fails on
             <strong style="color: var(--neon-yellow);">data</strong> no prompt can fix. Your evals tell you which is which.
         </p>
     </div>
@@ -765,14 +766,16 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
                 the pipeline when <span style="font-family: var(--font-hud); font-size: 14px;">warranty_accuracy</span> drops.</p>
             </div>
             <div class="feature-card bracketed navy reveal r4">
-                <div class="subhead" style="margin-bottom: 14px;">TRACES IN UNITY CATALOG</div>
-                <p class="body-text">Production traces land governed and queryable — lineage and audit on every
-                agent decision, debuggable in natural language ("which traces failed the warranty judge, and why?").</p>
+                <div class="subhead" style="margin-bottom: 14px;">GOVERN THE MODEL — UNITY AI GATEWAY</div>
+                <p class="body-text">Traces land governed and queryable in Unity Catalog. And every model call runs
+                behind <strong>Unity AI Gateway</strong>: guardrails as policy (PII + safety), payload logging to a UC
+                inference table, usage tracking, and <strong>spend caps</strong> across every model your agents call.</p>
             </div>
         </div>
         <div class="feature-card bracketed yellow reveal r5" style="box-shadow: 8px 8px 0 var(--neon-yellow);">
             <div class="subhead" style="margin-bottom: 14px;">EVALUATE BEFORE YOU SWAP</div>
-            <p class="body-text">Changing the model is one line in <span style="font-family: var(--font-hud); font-size: 14px;">app.yaml</span>.
+            <p class="body-text">Changing the model is one line in <span style="font-family: var(--font-hud); font-size: 14px;">app.yaml</span> —
+            and every model you route through the gateway is governed the same way.
             When this lab was built, one frontier model <em>self-corrected the planted warranty bug</em>; another
             failed tool-calling outright. Same agent, wildly different behavior — which is exactly why you'll
             leave today owning an eval harness that settles model choices with numbers instead of vibes.</p>

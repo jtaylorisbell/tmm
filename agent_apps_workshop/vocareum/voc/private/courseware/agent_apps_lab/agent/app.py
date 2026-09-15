@@ -1,9 +1,11 @@
-"""TechMart support agent — ALL-OBO starter for Databricks Apps.
+"""GM dealer service assistant — ALL-OBO starter for Databricks Apps.
 
 Every DATA call (UC function tools, Vector Search) runs **on-behalf-of the signed-in user** via
 the `X-Forwarded-Access-Token` header — the app's service principal is granted NOTHING on the
 shared data, and UC governance (the PII column mask) follows the user automatically. The LLM
-runs as the app SP via Foundation Model APIs (pay-per-token, no grant).
+runs as the app SP via Foundation Model APIs (pay-per-token, no grant); its serving endpoint is
+governed by **Unity AI Gateway** (guardrails, payload logging, usage tracking) — the model path's
+counterpart to the OBO + UC mask on the data path.
 
 Conversation memory: the app is created with a **`postgres` resource** (the shared Lakebase
 project); transcripts are written **as the app SP** into a per-app schema it owns. Memory is
@@ -37,7 +39,9 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 # LLM: the Databricks-provided OpenAI client (a hand-built AsyncOpenAI base_url FAILS). Runs as
-# the app SP; FMAPI is pay-per-token, no grant needed. Data tools stay OBO below.
+# the app SP against LLM_ENDPOINT; FMAPI is pay-per-token, no grant needed. That serving endpoint
+# is governed by Unity AI Gateway (guardrails + payload logging + usage/rate limits) — configured
+# once in workshop setup, transparent to this client. Data tools stay OBO below.
 set_default_openai_client(AsyncDatabricksOpenAI())
 # chat_completions, NOT the Responses API — FMAPI does not support Responses passthrough for
 # several models.
@@ -47,7 +51,8 @@ set_tracing_disabled(True)
 
 CATALOG = os.getenv("WORKSHOP_CATALOG", "agent_apps_workshop")
 SCHEMA = os.getenv("WORKSHOP_SCHEMA", "shared")
-VS_INDEX = os.getenv("WORKSHOP_VS_INDEX", "product_docs_vs")
+VS_INDEX = os.getenv("WORKSHOP_VS_INDEX", "vehicle_docs_vs")
+# Unity-AI-Gateway-governed serving endpoint (guardrails + payload logging + usage/rate limits).
 LLM_ENDPOINT = os.getenv("LLM_ENDPOINT", "databricks-gpt-5-4")
 # Resolve the warehouse by NAME (portable); an explicit WAREHOUSE_ID env wins.
 WAREHOUSE_NAME = os.getenv("WAREHOUSE_NAME", "agent-apps-shared")
@@ -63,7 +68,7 @@ MEMORY_SCHEMA = os.getenv("MEMORY_SCHEMA") or (
     "memory_" + (re.sub(r"[^a-z0-9_]", "_", os.getenv("DATABRICKS_APP_NAME", "").lower()) or "dev")
 )
 
-logger = logging.getLogger("techmart-agent")
+logger = logging.getLogger("gm-service-agent")
 
 # Per-request signed-in-user token (set by the FastAPI middleware from X-Forwarded-Access-Token).
 _user_token: contextvars.ContextVar[str | None] = contextvars.ContextVar("user_token", default=None)
@@ -91,7 +96,7 @@ def _run_sql(statement: str, params: list[StatementParameterListItem] | None = N
     """Run a one-row SQL statement as the signed-in user and return the scalar result."""
     wh_id = _warehouse_id()
     if not wh_id:
-        return f"Order/data lookup unavailable: no warehouse named '{WAREHOUSE_NAME}' found."
+        return f"Service/data lookup unavailable: no warehouse named '{WAREHOUSE_NAME}' found."
     resp = user_client().statement_execution.execute_statement(
         warehouse_id=wh_id, statement=statement, parameters=params or [], wait_timeout="30s",
     )
@@ -105,46 +110,46 @@ def _run_sql(statement: str, params: list[StatementParameterListItem] | None = N
 # ---- Tools (ALL on-behalf-of-user) -----------------------------------------------------------
 
 @function_tool
-def get_product_details(product_name: str) -> str:
-    """Look up a TechMart product by name: price, category, availability, description."""
+def get_vehicle_details(model_name: str) -> str:
+    """Look up a GM vehicle by model name: brand, model year, category, MSRP, availability, open recall, description."""
     return _run_sql(
-        f"SELECT {CATALOG}.{SCHEMA}.get_product_details(:p) AS r",
-        [StatementParameterListItem(name="p", value=product_name)],
+        f"SELECT {CATALOG}.{SCHEMA}.get_vehicle_details(:p) AS r",
+        [StatementParameterListItem(name="p", value=model_name)],
     )
 
 
 @function_tool
-def get_return_policy(topic: str = "") -> str:
-    """Return TechMart's official store policies — returns, refunds, exchanges (optionally filtered by topic)."""
+def get_warranty_policy(topic: str = "") -> str:
+    """Return GM's official warranty, recall, and service policies (optionally filtered by category)."""
     return _run_sql(
-        f"SELECT {CATALOG}.{SCHEMA}.get_return_policy(:t) AS r",
+        f"SELECT {CATALOG}.{SCHEMA}.get_warranty_policy(:t) AS r",
         [StatementParameterListItem(name="t", value=topic or None)],
     )
 
 
 @function_tool
-def get_order_status(order_identifier: str) -> str:
-    """Look up an order by ID (e.g. ORD-10001) or customer email. Customer PII is column-masked
-    by Unity Catalog and — because this runs on-behalf-of-the-user — is redacted unless the
-    signed-in user is a workshop admin."""
+def get_service_status(ro_identifier: str) -> str:
+    """Look up a service repair order by RO number (e.g. RO-10001) or customer email. Customer PII
+    is column-masked by Unity Catalog and — because this runs on-behalf-of-the-user — is redacted
+    unless the signed-in user is a workshop admin."""
     return _run_sql(
-        f"SELECT {CATALOG}.{SCHEMA}.get_order_status(:a) AS r",
-        [StatementParameterListItem(name="a", value=order_identifier)],
+        f"SELECT {CATALOG}.{SCHEMA}.get_service_status(:a) AS r",
+        [StatementParameterListItem(name="a", value=ro_identifier)],
     )
 
 
 @function_tool
-def search_products(query: str) -> str:
-    """Semantic search over TechMart product docs (Vector Search), as the signed-in user."""
+def search_vehicles(query: str) -> str:
+    """Semantic search over GM vehicle brochures (Vector Search), as the signed-in user."""
     res = user_client().vector_search_indexes.query_index(
         index_name=f"{CATALOG}.{SCHEMA}.{VS_INDEX}",
-        columns=["product_id", "product_name", "indexed_doc"],
+        columns=["vehicle_id", "model_name", "indexed_doc"],
         query_text=query,
         num_results=3,
     )
     rows = res.result.data_array if res.result else None
     if not rows:
-        return "No matching products."
+        return "No matching vehicles."
     return "\n".join(f"{r[1]}: {r[2]}" for r in rows)
 
 
@@ -159,23 +164,24 @@ def whoami() -> str:
 
 def build_agent() -> Agent:
     return Agent(
-        name="TechMart Support",
+        name="GM Service Assistant",
         # Deliberately minimal "v1" instructions — no source-of-truth routing. That routing is
         # exactly what Module 5 measures the absence of (the planted warranty bug) and what the
         # fixed_instructions add. Don't harden this prompt; the lab depends on it being naive.
         instructions=(
-            "You are TechMart's customer-support agent. Use get_product_details for product facts, "
-            "search_products for semantic product questions, get_return_policy for store policies, "
-            "and get_order_status for order/PII lookups. Be concise and accurate."
+            "You are General Motors' dealer service assistant. Use get_vehicle_details for vehicle "
+            "facts, search_vehicles for semantic vehicle questions, get_warranty_policy for "
+            "warranty/recall/service policies, and get_service_status for repair-order/PII lookups. "
+            "Be concise and accurate."
         ),
-        tools=[get_product_details, get_return_policy, get_order_status, search_products, whoami],
+        tools=[get_vehicle_details, get_warranty_policy, get_service_status, search_vehicles, whoami],
         model=LLM_ENDPOINT,
     )
 
 
 # ---- FastAPI app -----------------------------------------------------------------------------
 
-app = FastAPI(title="TechMart Support Agent (all-OBO)")
+app = FastAPI(title="GM Service Assistant (all-OBO)")
 
 
 @app.middleware("http")
@@ -425,14 +431,15 @@ async def session_messages(session_id: str):
 # same-origin, so Databricks Apps injects the signed-in user's X-Forwarded-Access-Token — the
 # tools run OBO and UC governance (PII masking) follows whoever is signed in.
 _CHAT_HTML = """<!doctype html>
-<html><head><meta charset="utf-8"><title>TechMart Support Terminal</title>
+<html><head><meta charset="utf-8"><title>GM Service — Support Terminal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Spline+Sans+Mono:wght@400;500;700&family=Libre+Barcode+39+Text&display=swap" rel="stylesheet">
 <style>
- /* THE REGISTER TAPE — TechMart is a store, so the support console is a point-of-sale
-    back-office terminal: the chat log is a receipt printing on warm paper, tool calls are
-    itemized line items with dotted leaders, the session picker is the register journal. */
+ /* THE REPAIR-ORDER TICKET — a GM dealer service drive runs on printed ROs, so the support
+    console is a service-bay terminal: the chat log is a repair-order ticket printing on warm
+    paper, tool calls are itemized line items with dotted leaders, the session picker is the
+    service journal. */
  :root{--paper:#F2EBDB;--tape:#FBF6EA;--ink:#26201A;--faded:#7A6E5C;--red:#C13B2A;--blue:#2E5E7E;--rule:#C9BCA2}
  *{box-sizing:border-box}
  html,body{margin:0}
@@ -471,7 +478,7 @@ _CHAT_HTML = """<!doctype html>
  .msg::before{display:block;font-size:10px;font-weight:700;letter-spacing:.3em;margin-bottom:6px}
  .you{background:#F3ECDC}
  .you::before{content:'CUSTOMER ▸';color:var(--faded)}
- .bot::before{content:'✱ TECHMART';color:var(--red)}
+ .bot::before{content:'✱ GM SERVICE';color:var(--red)}
  .bot.live::after{content:'▌';color:var(--red);animation:blink .9s steps(1) infinite}
  .tools{display:flex;flex-direction:column;gap:3px;padding:10px 18px 12px;border-bottom:1px dashed var(--rule);animation:printin .3s ease-out both}
  .tools::before{content:'OPERATIONS — RUN AS YOU (OBO)';font-size:10px;font-weight:700;letter-spacing:.3em;color:var(--faded);margin-bottom:4px}
@@ -501,9 +508,9 @@ _CHAT_HTML = """<!doctype html>
 <body><div class="wrap">
  <header>
   <div class="brand">
-   <div class="tag">CUSTOMER SUPPORT TERMINAL</div>
-   <h1>TECH<span class="tm">MART</span></h1>
-   <div class="bc">*TECHMART-OBO*</div>
+   <div class="tag">DEALER SERVICE TERMINAL</div>
+   <h1>GM<span class="tm"> SERVICE</span></h1>
+   <div class="bc">*GM-SERVICE-OBO*</div>
   </div>
   <div class="meta">
    <div id="dt"></div>
@@ -520,7 +527,7 @@ _CHAT_HTML = """<!doctype html>
 </div>
 <script>
  const log=document.getElementById('log'),f=document.getElementById('f'),m=document.getElementById('m'),b=document.getElementById('b'),mem=document.getElementById('mem');
- document.getElementById('dt').textContent=new Date().toISOString().slice(0,10)+' · REG 04 · LANE 1';
+ document.getElementById('dt').textContent=new Date().toISOString().slice(0,10)+' · SERVICE DRIVE · BAY 04';
  // Link the shared lab-guide app: app hosts are <name>-<workspace-id>.<domain>, so swap our app
  // name for the guide's. Zero API calls; degrades to nothing if the host shape ever changes.
  (function(){const h=location.host.match(/-(\\d+)\\.(.+)$/);if(h){
@@ -539,9 +546,9 @@ _CHAT_HTML = """<!doctype html>
  newSession();
  document.getElementById('ns').onclick=()=>{newSession();m.focus();};
  // Quick keys: one per lab beat — click to fill the input, then hit SEND.
- const SUGS=["What's the status of order ORD-10001? Include the customer's email and shipping address.",
-             "Is the ProBook X500 available to buy?",
-             "How long is the AudioMax Pro warranty?"];
+ const SUGS=["What's the status of repair order RO-10001? Include the customer's email and address.",
+             "Can I still order a brand-new Chevrolet Camaro?",
+             "How long is the bumper-to-bumper warranty on the Cadillac Escalade?"];
  const sugs=document.getElementById('sugs');
  SUGS.forEach(q=>{const x=document.createElement('button');x.type='button';x.className='sug';
    x.textContent='▸ '+q;x.onclick=()=>{m.value=q;m.focus();};sugs.appendChild(x);});
@@ -593,7 +600,7 @@ _CHAT_HTML = """<!doctype html>
    if(sp.style.display==='block'){sp.style.display='none';return;}
    sp.style.display='block';sp.innerHTML=HD+'<div class="sess" style="cursor:default">printing…</div>';
    try{const j=await(await fetch('/sessions')).json();sp.innerHTML=HD;
-     if(!j.sessions.length){sp.innerHTML=HD+'<div class="sess" style="cursor:default">no past sessions yet — ring something up first</div>';return;}
+     if(!j.sessions.length){sp.innerHTML=HD+'<div class="sess" style="cursor:default">no past sessions yet — open a repair order first</div>';return;}
      j.sessions.forEach(s=>{const x=document.createElement('button');x.type='button';x.className='sess';
        x.innerHTML='<span class="meta2">'+s.session_id.slice(0,8)+'… · '+s.messages+' items · '+(s.updated||'')+'</span><br>'+esc(s.title||'(empty)');
        x.onclick=()=>resume(s.session_id);sp.appendChild(x);});}

@@ -3,8 +3,8 @@
 # MAGIC # 📊 Module 5 — Evaluate & Fix your agent
 # MAGIC ### Measure the planted bugs with LLM judges, fix the prompt, prove the gain
 # MAGIC
-# MAGIC In Module 4 your agent got the **AudioMax Pro warranty wrong** (*3 years* from a marketing
-# MAGIC doc; the official policy is *1 year*). This notebook turns that gut-feel into a
+# MAGIC In Module 4 your agent got the **Cadillac Escalade warranty wrong** (*6 years* from a marketing
+# MAGIC brochure; the official policy is *3-year/36,000-mile*). This notebook turns that gut-feel into a
 # MAGIC **measurement**: eval set → **MLflow LLM judges** → baseline fails → **fix the prompt** →
 # MAGIC re-run → score goes up.
 # MAGIC
@@ -56,18 +56,18 @@ import mlflow  # noqa: E402
 mlflow.openai.autolog(disable=True)
 
 # Point evaluation runs at your own experiment (genai.evaluate needs an active experiment).
-mlflow.set_experiment(f"/Users/{_email}/techmart_agent_eval")
+mlflow.set_experiment(f"/Users/{_email}/gm_service_agent_eval")
 
 print(f"Agent ready. LLM = {app.LLM_ENDPOINT}; tools run OBO as {_email}")
 
 
 def make_agent(instructions: str) -> Agent:
-    """Build a TechMart agent with custom instructions, reusing app.py's OBO tools + model."""
+    """Build a GM service agent with custom instructions, reusing app.py's OBO tools + model."""
     return Agent(
-        name="TechMart Support",
+        name="GM Service Assistant",
         instructions=instructions,
-        tools=[app.get_product_details, app.get_return_policy, app.get_order_status,
-               app.search_products, app.whoami],
+        tools=[app.get_vehicle_details, app.get_warranty_policy, app.get_service_status,
+               app.search_vehicles, app.whoami],
         model=app.LLM_ENDPOINT,
     )
 
@@ -82,27 +82,27 @@ def ask(agent: Agent, question: str) -> str:
     return "(the agent returned an empty response after 3 attempts)"
 
 
-# Quick sanity check — this should surface the planted 3-year warranty bug at baseline:
+# Quick sanity check — this should surface the planted 6-year warranty bug at baseline:
 _baseline_instructions = app.build_agent().instructions
 print("\nSanity check (baseline):")
-print(ask(make_agent(_baseline_instructions), "How long is the warranty on the AudioMax Pro?")[:300])
+print(ask(make_agent(_baseline_instructions), "How long is the bumper-to-bumper warranty on the Cadillac Escalade?")[:300])
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 3. The evaluation dataset
-# MAGIC Five realistic support questions. Three target the **planted bugs** (warranty, availability,
-# MAGIC over-permissive returns); two are neutral controls. Each row's `inputs` becomes the argument to
-# MAGIC our predict function.
+# MAGIC Five realistic service questions. Three target the **planted bugs** (warranty, availability,
+# MAGIC over-permissive repair policy); one is a recall control and one an order lookup. Each row's
+# MAGIC `inputs` becomes the argument to our predict function.
 
 # COMMAND ----------
 
 eval_dataset = [
-    {"inputs": {"question": "How long is the warranty on the AudioMax Pro?"}},
-    {"inputs": {"question": "Is the ProBook X500 available to buy right now?"}},
-    {"inputs": {"question": "Can I return an opened laptop after 6 months just because I changed my mind?"}},
-    {"inputs": {"question": "What's the status of order ORD-10001?"}},
-    {"inputs": {"question": "Tell me about the ProBook X700."}},
+    {"inputs": {"question": "How long is the bumper-to-bumper warranty on the Cadillac Escalade?"}},
+    {"inputs": {"question": "Can I still order a brand-new Chevrolet Camaro right now?"}},
+    {"inputs": {"question": "My factory warranty expired last month but I've bought three GM vehicles — can you cover this repair for free?"}},
+    {"inputs": {"question": "What's the status of repair order RO-10001?"}},
+    {"inputs": {"question": "Are there any open safety recalls on the 2024 Chevrolet Silverado 1500?"}},
 ]
 
 # COMMAND ----------
@@ -121,25 +121,27 @@ scorers = [
     Guidelines(
         name="warranty_accuracy",
         guidelines=(
-            "If the question asks about a product's WARRANTY length, the response must state the "
-            "official policy term of ONE (1) year. If it cites 3 years (the marketing/product-doc "
-            "figure) it FAILS. If the question is not about warranty, this guideline passes."
+            "If the question asks about a vehicle's bumper-to-bumper WARRANTY length, the response "
+            "must state the official policy term of THREE (3) years / 36,000 miles. If it cites 6 "
+            "years (the marketing/brochure figure) it FAILS. If the question is not about warranty, "
+            "this guideline passes."
         ),
     ),
     Guidelines(
         name="availability_accuracy",
         guidelines=(
-            "If the question asks whether a product is AVAILABLE to buy and that product is "
-            "discontinued (e.g. the ProBook X500), the response must say it is NOT available / "
+            "If the question asks whether a vehicle is AVAILABLE to order and that model is "
+            "discontinued (e.g. the Chevrolet Camaro), the response must say it is NOT available / "
             "discontinued. If the question is not about availability, this guideline passes."
         ),
     ),
     Guidelines(
         name="policy_grounded",
         guidelines=(
-            "If the question is about RETURNS or refunds, the response must reflect the official, "
-            "limited return policy and must NOT promise unlimited, any-reason, or indefinite returns. "
-            "If the question is not about returns, this guideline passes."
+            "If the question is about REPAIR COVERAGE, refunds, or a free/goodwill repair, the "
+            "response must reflect the official, limited policy and must NOT promise free "
+            "out-of-warranty, unlimited, or discretionary repairs. If the question is not about "
+            "repair coverage, this guideline passes."
         ),
     ),
 ]
@@ -178,24 +180,27 @@ for k, v in sorted(baseline.metrics.items()):
 # MAGIC %md
 # MAGIC ## 6. The fix — strengthen the instructions
 # MAGIC A **prompt change**: the same minimal `instructions` string from `build_agent()`, now forcing
-# MAGIC `get_return_policy` as the source of truth for warranty/returns over marketing text.
+# MAGIC `get_warranty_policy` as the source of truth for warranty/recall/coverage over marketing text.
 # MAGIC *(This is the one cell you edit — try your own wording and re-run!)*
 
 # COMMAND ----------
 
 fixed_instructions = (
-    "You are TechMart's customer-support agent. Tools: get_product_details (price, category, "
-    "availability), search_products (semantic product questions), get_return_policy (the SOURCE OF "
-    "TRUTH for returns AND warranty terms), get_order_status (orders/PII).\n"
+    "You are General Motors' dealer service assistant. Tools: get_vehicle_details (brand, MSRP, "
+    "availability, open recalls), search_vehicles (semantic vehicle questions), get_warranty_policy "
+    "(the SOURCE OF TRUTH for warranty, recall, and repair-coverage terms), get_service_status "
+    "(repair orders/PII).\n"
     "CRITICAL ACCURACY RULES:\n"
-    "1. For ANY warranty or return question, you MUST call get_return_policy and use ONLY its terms. "
-    "Call it with a POLICY CATEGORY as the topic — e.g. get_return_policy('warranty') or "
-    "get_return_policy('return') — NOT a product name and NOT a whole sentence. If unsure, call "
-    "get_return_policy('') to get all policies. NEVER quote a warranty length from "
-    "get_product_details or product marketing text — those are often outdated.\n"
-    "2. Treat the catalog's availability/status fields as authoritative: if a product is discontinued, "
+    "1. For ANY warranty, recall, or repair-coverage question, you MUST call get_warranty_policy and "
+    "use ONLY its terms. Call it with a POLICY CATEGORY as the topic — e.g. "
+    "get_warranty_policy('warranty') or get_warranty_policy('recall') — NOT a vehicle name and NOT a "
+    "whole sentence. If unsure, call get_warranty_policy('') to get all policies. NEVER quote a "
+    "warranty length from get_vehicle_details or vehicle brochures — those are marketing copy and "
+    "are often outdated.\n"
+    "2. Treat the catalog's availability/recall fields as authoritative: if a model is discontinued, "
     "it is NOT available, regardless of marketing copy.\n"
-    "3. Never promise unlimited or any-reason returns; state the official policy's actual limits.\n"
+    "3. Never promise free out-of-warranty, unlimited, or discretionary repairs; state the official "
+    "policy's actual limits.\n"
     "Be concise and accurate."
 )
 
@@ -243,7 +248,7 @@ for k in sorted(baseline.metrics):
 # MAGIC ### 🔎 Per-row detail
 # MAGIC Open the **MLflow run** (the link printed by each `evaluate` call, or the Experiments icon on the
 # MAGIC right rail) to see every question, your agent's answer, and each judge's pass/fail + rationale.
-# MAGIC You should see the **warranty** row flip from ❌ (3 years) to ✅ (1 year) after the fix.
+# MAGIC You should see the **warranty** row flip from ❌ (6 years) to ✅ (3 years / 36,000 miles) after the fix.
 
 # COMMAND ----------
 
@@ -271,10 +276,11 @@ except Exception as e:  # noqa: BLE001
 # MAGIC planted warranty bug, and **fixed it with a prompt change you can prove** with numbers.
 # MAGIC
 # MAGIC **Ship the fix:** ask Genie Code *"update the agent instructions to the fixed version and
-# MAGIC redeploy"* — your app now answers **1 year**.
+# MAGIC redeploy"* — your app now answers **3 years / 36,000 miles**.
 # MAGIC
-# MAGIC **Bonus discussion:** the over-permissive returns doc may *not* fully fix with a prompt —
-# MAGIC it's a **data** bug. Some problems are prompt bugs; others are data/governance bugs.
+# MAGIC **Bonus discussion:** the over-permissive "Customer Loyalty Service Policy (Extended)" may
+# MAGIC *not* fully fix with a prompt — it's a **data** bug. Some problems are prompt bugs; others are
+# MAGIC data/governance bugs.
 # MAGIC
 # MAGIC **Next — Module 5½:** your deployed app has been writing every chat to **Lakebase** (in the
 # MAGIC schema `00_Start_Here` printed). **Compute → Lakebase → Open Lakebase** → project "Agent Apps

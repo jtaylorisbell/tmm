@@ -1,24 +1,23 @@
 # 🛠️ Build a Custom AI Agent on Databricks Apps — Participant Guide
 
-### From Prompt to Production · Data + AI Summit 2026 · ~90 min
+### From Prompt to Production · Built for General Motors · ~40 min
 
-You're a data engineer at **TechMart** (a fictional electronics retailer) standing up an AI
-customer-support agent. You'll **build** it on Databricks Apps, **govern** it, deliberately
-**break** it, **measure** the breakage with LLM judges, **fix** it, and **prove** the fix — the
-full agent-hardening loop.
+You're a data engineer at **General Motors** standing up an AI **dealer service assistant**. You'll
+**build** it on Databricks Apps, **govern** it, deliberately **break** it, **measure** the breakage
+with LLM judges, **fix** it, and **prove** the fix — the full agent-hardening loop.
 
 > **This is a coding-agent-driven lab.** You direct **Genie Code** (the in-workspace coding
 > agent); it builds and deploys for you. Screenshots show what you should see at each step.
 
-**Already set up for you** (shared, in catalog `agent_apps_workshop.shared`): the TechMart tables
-(`products`, `orders`, `policies`, `product_docs`), a Vector Search index, three UC function
-tools, a SQL warehouse, a PII column mask, and a **Lakebase** project for agent memory. **Your**
-home folder has `agent_apps_lab/` with the lab notebooks, a ready-to-run `agent/` starter, and
-`LAB_CONTEXT.md`.
+**Already set up for you** (shared, in catalog `agent_apps_workshop.shared`): the GM tables
+(`vehicles`, `repair_orders`, `policies`, `vehicle_docs`), a Vector Search index, three UC function
+tools, a SQL warehouse, a PII column mask, a **Lakebase** project for agent memory, and a **Unity AI
+Gateway**-governed LLM endpoint. **Your** home folder has `agent_apps_lab/` with the lab notebooks, a
+ready-to-run `agent/` starter, and `LAB_CONTEXT.md`.
 
 ---
 
-## Module 0 — Meet Genie Code & give it the lab context (~5 min)
+## Module 0 — Meet Genie Code & give it the lab context (~3 min)
 
 1. **Open `agent_apps_lab/00_Start_Here`** and **run the "Your lab values" cell** — it prints the
    shared names you'll use all lab, including **your app name**.
@@ -27,7 +26,7 @@ home folder has `agent_apps_lab/` with the lab notebooks, a ready-to-run `agent/
 
 2. **Open Genie Code** (panel in the notebook, or the top-bar button) and ask: **"what skills do
    you have available?"** These Databricks-authored skills give Genie the platform mechanics —
-   but notice there's no TechMart-specific one. Step 3 fixes that.
+   but notice there's no GM-specific one. Step 3 fixes that.
 
    ![Genie Code lists its skills](img/02-genie-skills-list.png)
 
@@ -39,34 +38,35 @@ home folder has `agent_apps_lab/` with the lab notebooks, a ready-to-run `agent/
 
 ---
 
-## Module 1 — Explore the data (~10 min)
+## Module 1 — Explore the data (~5 min)
 
 Open **`agent_apps_lab/01_Explore_Data`** and run it top to bottom. Two things to notice:
 
-- **Governance is live:** in `orders`, customer **email and address show `***REDACTED***`** —
+- **Governance is live:** in `repair_orders`, customer **email and address show `***REDACTED***`** —
   a Unity Catalog **column mask**, applied to you as a non-admin. (Admins see real values.)
 
-  ![Orders with masked PII](img/01-explore-orders-masked.png)
+  ![Repair orders with masked PII](img/01-explore-orders-masked.png)
 
-- **Something's off in the product docs:** the marketing docs don't always agree with the
+- **Something's off in the vehicle brochures:** the marketing brochures don't always agree with the
   catalog… keep that in mind for Module 4. 🙂
 
-  ![Products table](img/01-explore-products.png)
+  ![Vehicles table](img/01-explore-products.png)
 
 ---
 
-## Module 2 — Build & deploy your agent (~10 min, mostly waiting)
+## Module 2 — Build & deploy your agent (~6 min, mostly waiting)
 
 With `LAB_CONTEXT.md` attached, ask Genie naturally:
 
-> *"hey! i'm starting the techmart lab. can you set up my customer support agent as an app?"*
+> *"hey! i'm starting the GM service agent lab. can you set up my dealer service assistant as an app?"*
 
 ![Attach context + naive deploy prompt](img/03-attach-context-deploy-prompt.png)
 
 Genie runs the shipped **`02_Deploy_App`** notebook — the validated deploy sequence as code:
 create app (with its **Lakebase memory resource**) → wait for compute → set up database access →
 set the OBO scopes → deploy → confirm. **Approve the actions it proposes** (`Allow`/`Run`).
-Provisioning takes a few minutes; waiting and one extra app restart along the way are normal.
+Provisioning takes a few minutes — **you don't have to wait**: while it deploys, use the shared
+**reference app** your instructor shared for Modules 3–4, then switch to your own once it's up.
 
 > ⚠️ **Keep Genie's "Auto-approve" OFF for this step.** Deploying creates an app (a workspace
 > change), which Auto-approve flags as "unsafe" and **blocks** — you'll see *"Action denied"* and
@@ -84,14 +84,15 @@ tools + a model**:
 ```python
 def build_agent() -> Agent:
     return Agent(
-        name="TechMart Support",
+        name="GM Service Assistant",
         # Deliberately minimal "v1" instructions — no source-of-truth routing. ...
         instructions=(
-            "You are TechMart's customer-support agent. Use get_product_details for product facts, "
-            "search_products for semantic product questions, get_return_policy for store policies, "
-            "and get_order_status for order/PII lookups. Be concise and accurate."
+            "You are General Motors' dealer service assistant. Use get_vehicle_details for vehicle "
+            "facts, search_vehicles for semantic vehicle questions, get_warranty_policy for "
+            "warranty/recall/service policies, and get_service_status for repair-order/PII lookups. "
+            "Be concise and accurate."
         ),
-        tools=[get_product_details, get_return_policy, get_order_status, search_products, whoami],
+        tools=[get_vehicle_details, get_warranty_policy, get_service_status, search_vehicles, whoami],
         model=LLM_ENDPOINT,
     )
 ```
@@ -100,8 +101,8 @@ def build_agent() -> Agent:
   that costs; the fix is an edit to exactly this string. **Peek, don't edit yet.**
 - **A tool is just a decorated Python function** running with *your* forwarded token — that's why
   the PII mask follows you through the app.
-- **The model is one env var** (`LLM_ENDPOINT` in `app.yaml`) — swapping models is a one-line
-  change, but evaluate first (Module 6).
+- **The model is one env var** (`LLM_ENDPOINT` in `app.yaml`), and that endpoint is governed by
+  **Unity AI Gateway** — swapping models is a one-line change, but evaluate first (Module 6).
 
 When the deploy finishes you get your **app URL**:
 
@@ -109,35 +110,41 @@ When the deploy finishes you get your **app URL**:
 
 **What you deployed:** an OpenAI Agents SDK app whose **data tools run on-behalf-of-YOU** — its
 service principal has *zero* grants on the shared data. The LLM runs on Foundation Model APIs
-(pay-per-token), and conversation memory writes to **Lakebase** as the app's own service
-principal, into a schema it owns. You'll go look at those rows near the end.
+(pay-per-token) through a **Unity AI Gateway**-governed endpoint, and conversation memory writes to
+**Lakebase** as the app's own service principal, into a schema it owns. You'll go look at those rows
+near the end.
 
-In the chat UI, replies **stream in live** — and each 🔧 tool call prints as a receipt line item
+In the chat UI, replies **stream in live** — and each 🔧 tool call prints as a repair-order line item
 *while the agent works*, so you watch it think before it answers.
 
 ---
 
-## Module 3 — Govern with OBO (~5 min)
+## Module 3 — Govern with OBO + Unity AI Gateway (~6 min)
 
-1. **Open your app URL.** First open shows a **"Permission Requested"** consent screen — exactly
-   what the app may do *as you*: **Databricks SQL** and **Vector Search**. (Memory needs no
-   consent: it runs as the app's own service principal.) Click **Authorize**.
+1. **Open your app URL** (or the shared reference app). First open shows a **"Permission Requested"**
+   consent screen — exactly what the app may do *as you*: **Databricks SQL** and **Vector Search**.
+   (Memory needs no consent: it runs as the app's own service principal.) Click **Authorize**.
 
    ![OBO consent screen](img/05-consent-screen.png)
 
 2. In the chat, ask:
 
-   > *"What's the status of order ORD-10001? Include the customer's email and shipping address."*
+   > *"What's the status of repair order RO-10001? Include the customer's email and address."*
 
-   The order comes back with **email and address redacted** — the same column mask from
+   The repair order comes back with **email and address redacted** — the same column mask from
    Module 1, following your identity through the deployed app. **Governance you didn't build.**
    (Note the header's **acting as:** line and the 🔧 **tool-call chips** — the app layer showing
    you exactly what the agent did, as whom.)
 
-3. **It remembers.** Ask *"and when was that order placed?"* — the header shows your session id,
-   and every turn is stored in Lakebase under it.
-
    ![Chat: PII redacted through the agent](img/06-chat-pii-redacted.png)
+
+3. **The model call is governed too.** Your agent's LLM endpoint runs behind **Unity AI Gateway** —
+   guardrails screen the request/response for PII and unsafe content, every call is logged to a
+   Unity Catalog inference table, and usage is tracked and rate-limited. Two paths, both governed in
+   Unity Catalog: your **data** via OBO + the column mask, your **model** via Unity AI Gateway.
+
+4. **It remembers.** Ask *"and what was the total on that repair?"* — the header shows your session id,
+   and every turn is stored in Lakebase under it.
 
 ---
 
@@ -145,18 +152,18 @@ In the chat UI, replies **stream in live** — and each 🔧 tool call prints as
 
 Probe the agent:
 
-> *"Is the ProBook X500 available to buy?"* · *"How long is the AudioMax Pro warranty?"*
+> *"Can I still order a brand-new Chevrolet Camaro?"* · *"How long is the bumper-to-bumper warranty on the Cadillac Escalade?"*
 
 ![Chat: the planted bug surfaces](img/07-chat-planted-bug.png)
 
-The agent says **3-year warranty**; the official policy is **1 year**. The 🔧 chips tell you
-*why*: which tools did it call — and did it ever ask for the official policy? A real
+The agent says **6-year warranty**; the official policy is **3 years / 36,000 miles**. The 🔧 chips
+tell you *why*: which tools did it call — and did it ever ask for the official policy? A real
 agent-quality bug (we planted three). Gut feel says it's broken; Module 5 **measures** it —
 and after you ship the fix, watch the chips change.
 
 ---
 
-## Module 5 — Evaluate & fix (~15 min)
+## Module 5 — Evaluate & fix (~10 min)
 
 1. **Open `agent_apps_lab/05_Evaluate_and_Fix` → Run all.** It rebuilds your agent in-process
    (tools still OBO as you), runs a 5-question eval, and scores it with **MLflow `Guidelines`
@@ -177,15 +184,16 @@ and after you ship the fix, watch the chips change.
    per-row answers and judge rationales as **real traces**.
 
    > \* `policy_grounded` can stay dipped after the fix — that bug lives in the **data** (an
-   > over-permissive policy doc). Some agent bugs are prompt bugs; others are data bugs no
-   > prompt will fix.
+   > over-permissive loyalty service policy). Some agent bugs are prompt bugs; others are data bugs
+   > no prompt will fix.
 
 3. **Make it yours (optional):** edit `fixed_instructions`, re-run, then ask Genie to *"update
-   the agent instructions to the fixed version and redeploy"* — your app now answers **1 year**.
+   the agent instructions to the fixed version and redeploy"* — your app now answers **3 years /
+   36,000 miles**.
 
 ---
 
-## Module 5½ — Visit your agent's memory (~5 min)
+## Module 5½ — Visit your agent's memory (~2 min)
 
 Every conversation has been written to **Lakebase** (managed Postgres) in a schema your app's
 service principal owns: `memory_<your-app-name>` (printed by `00_Start_Here` and shown in the
@@ -219,9 +227,10 @@ chat header).
 
 You hardened one agent by hand; production needs repeatability. Recap with the instructor:
 package app + eval as a **Databricks Asset Bundle** (CI/CD), store **traces in Unity Catalog**,
-and run the judges as regression gates on every prompt or model change. (Model swap = one
-`app.yaml` line — but evaluate first; a different model may not even have your bug… or may have
-new ones.)
+run the judges as regression gates on every prompt or model change, and lean on **Unity AI Gateway**
+for production controls — guardrails as policy, payload logging, usage tracking, and **spend caps**
+across every model your agents call. (Model swap = one `app.yaml` line — but evaluate first; a
+different model may not even have your bug… or may have new ones.)
 
 ---
 
@@ -229,7 +238,7 @@ new ones.)
 
 | Symptom | Fix |
 |---|---|
-| Genie doesn't know about TechMart | Re-attach **`@LAB_CONTEXT.md`** — context doesn't carry across chats. |
+| Genie doesn't know about GM | Re-attach **`@LAB_CONTEXT.md`** — context doesn't carry across chats. |
 | App deploy fails on the name | Names are **≤30 chars**, lowercase/digits/hyphens — use the `APP_NAME` from `00_Start_Here`. |
 | Permission screen on app open | Expected once per user — click **Authorize**. |
 | App won't start / `/` errors | Check `https://<your-app-url>/logz`. |
@@ -239,7 +248,7 @@ new ones.)
 | Eval import errors | Run cells **in order** — the kernel restarts after the pinned install. |
 | `asyncio.run() cannot be called…` | The setup cell applies `nest_asyncio` — make sure it ran after the restart. |
 | Eval results seem noisy | Read **per-row** judge results in the MLflow run, not the averages. |
-| Browser/kernel hiccup mid-eval | The serverless run finishes server-side — results live in the **MLflow experiment** (`techmart_agent_eval`). |
+| Browser/kernel hiccup mid-eval | The serverless run finishes server-side — results live in the **MLflow experiment** (`gm_service_agent_eval`). |
 
 ---
 

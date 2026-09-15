@@ -1,4 +1,4 @@
-# TechMart Agent Lab — context for Genie Code
+# GM Service Agent Lab — context for Genie Code
 
 > **How to use this file:** In Genie Code, attach it as context (**Add context → Attach files**, or
 > type **`@LAB_CONTEXT.md`**) at the start of a working session. It gives Genie the lab-specific facts
@@ -7,15 +7,19 @@
 > Catalog skills for the data tools. (Skill names vary by Genie Code version; deploying needs no
 > "apps" skill at all — the shipped `02_Deploy_App` notebook IS the deploy path.)
 
-You are helping a workshop participant — a **non-admin lab user** — stand up a **TechMart**
-customer-support agent on Databricks Apps. Everything is already provisioned; help them *use* it
-(deploy, govern, break, evaluate), and prefer the shipped `agent/` folder over writing one from scratch.
+You are helping a workshop participant — a **non-admin lab user** — stand up a **General Motors**
+dealer service assistant on Databricks Apps (GM vehicles across Chevrolet / GMC / Buick / Cadillac,
+service repair orders, and warranty / recall policies). Everything is already provisioned; help them
+*use* it (deploy, govern, break, evaluate), and prefer the shipped `agent/` folder over writing one
+from scratch.
 
 ## Pre-provisioned, shared, read-only (catalog `agent_apps_workshop.shared`)
-- Tables `products`, `orders`, `policies`, `product_docs`, and a Vector Search index `product_docs_vs`.
-- UC function tools: `get_product_details`, `get_order_status`, `get_return_policy`.
+- Tables `vehicles`, `repair_orders`, `policies`, `vehicle_docs`, and a Vector Search index `vehicle_docs_vs`.
+- UC function tools: `get_vehicle_details`, `get_service_status`, `get_warranty_policy`.
 - SQL warehouse named **`agent-apps-shared`** — resolve it **by name**, never hardcode an id.
-- A Unity Catalog column mask redacts `orders` customer PII for non-admins (the governance story).
+- A Unity Catalog column mask redacts `repair_orders` customer PII for non-admins (the governance story).
+- The agent's LLM serving endpoint is governed by **Unity AI Gateway** (guardrails, payload logging,
+  usage/rate limits) — set up in workshop provisioning; the agent code doesn't change for it.
 - A ready-to-run agent already lives in the participant's **`agent/` folder** — deploy and customize it.
 
 ## The one hard constraint — DATA access runs on-behalf-of-the-user (OBO)
@@ -38,10 +42,11 @@ single-turn (the UI shows "memory: off") — the lab still works. Near the end o
 visit the Lakebase UI and query their app's schema to see their conversation history.
 
 ## The planted bugs (they drive Module 4 "break it" and Module 5 "evaluate & fix")
-The data intentionally contradicts itself: a **discontinued** product whose marketing doc still says
-it's available; a product-doc **warranty (3 yr)** that conflicts with the official **policy (1 yr)**; and
-an over-permissive **"Customer Satisfaction Policy (Extended)."** A good agent trusts the authoritative
-tables / official policy over the marketing docs, and the evaluation should measure exactly that.
+The data intentionally contradicts itself: a **discontinued** model (the Chevrolet Camaro) whose
+marketing brochure still says it's available to order; a Cadillac brochure **warranty (6 yr / 72,000
+mi)** that conflicts with the official **policy (3 yr / 36,000 mi)**; and an over-permissive
+**"Customer Loyalty Service Policy (Extended)."** A good agent trusts the authoritative tables /
+official policy over the marketing brochures, and the evaluation should measure exactly that.
 
 ## Deploying the app — RUN the shipped `02_Deploy_App` notebook (do NOT regenerate the sequence)
 The participant's folder ships **`02_Deploy_App`** — the validated deploy sequence as runnable,
@@ -120,7 +125,7 @@ encodes the gotchas below, so you shouldn't need to hand-write the harness:
   `mlflow.set_experiment(...)` first.
 - Judges: `Guidelines` scorers with conditional wording ("if not about X, pass"); predict_fn's
   param name must match the `inputs` key. Small set — read per-row, not means.
-- **The warranty flip needs the right tool call:** `get_return_policy(topic)` filters by a policy
-  CATEGORY — `get_return_policy('warranty')` returns the 1-yr term; passing a product name
-  (`get_return_policy('AudioMax Pro')`) returns empty. The `fixed_instructions` cell tells the agent to
-  call it with a category (not a product name), which is what flips warranty from 3-yr (fail) to 1-yr (pass).
+- **The warranty flip needs the right tool call:** `get_warranty_policy(topic)` filters by a policy
+  CATEGORY — `get_warranty_policy('warranty')` returns the 3-yr/36,000-mi term; passing a vehicle name
+  (`get_warranty_policy('Escalade')`) returns empty. The `fixed_instructions` cell tells the agent to
+  call it with a category (not a vehicle name), which is what flips warranty from 6-yr (fail) to 3-yr (pass).
