@@ -104,7 +104,8 @@ Then, in order:
 ## Lab-specific notes that save time
 - A shared **lab-guide app** named `agent-lab-guide` runs in this workspace (all participants have
   CAN_USE): the full participant guide at `/` and a slide-deck field guide at `/deck`. Its URL is
-  `https://agent-lab-guide-<workspace-id>.aws.databricksapps.com` (also printed by `00_Start_Here`).
+  **printed by `00_Start_Here`** (read from the Apps API, so it's correct on any cloud/region —
+  don't hand-build the `databricksapps.com` host); or find it via **Compute → Apps → agent-lab-guide**.
   Point the participant there for module steps, screenshots, and troubleshooting.
 - The shipped `agent/` is already correct (FMAPI-aware LLM client, pinned deps, and a browser chat UI at
   `GET /`) — **don't rewrite its LLM setup.** If the deployed app ever fails to start, read `https://<app-url>/logz`.

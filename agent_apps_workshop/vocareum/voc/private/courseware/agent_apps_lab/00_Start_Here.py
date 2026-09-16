@@ -69,12 +69,16 @@ SCHEMA = "shared"
 # PREFIX and differ in the trailing digits — the tail is what makes each name unique.
 APP_NAME = ("agent-apps-" + username[-19:].lstrip("-")).rstrip("-")
 # The shared lab-guide app (deployed by workshop setup; one per workspace, all students CAN_USE).
-# App URLs are <app-name>-<workspace-id>.<cloud-domain>; derive ours from the workspace id so the
-# link works in every lab workspace without hardcoding.
+# Read the app's REAL url from the Apps API rather than constructing the host by hand: Apps URLs
+# vary by cloud AND region — e.g. <app>-<ws-id>.aws.databricksapps.com on AWS vs
+# <app>-<ws-id>.<NN>.azure.databricksapps.com on Azure — so a hand-built host only works on AWS.
+# CAN_USE is enough to GET the app; if the lookup fails we fall back to UI navigation below.
+GUIDE_APP_NAME = "agent-lab-guide"
 def _guide_url() -> str:
     try:
-        ws_id = dbutils.notebook.entry_point.getDbutils().notebook().getContext().workspaceId().get()
-        return f"https://agent-lab-guide-{ws_id}.aws.databricksapps.com"
+        from databricks.sdk import WorkspaceClient
+        info = WorkspaceClient().api_client.do("GET", f"/api/2.0/apps/{GUIDE_APP_NAME}")
+        return (info or {}).get("url") or ""
     except Exception:
         return ""  # fall back to UI navigation below
 
