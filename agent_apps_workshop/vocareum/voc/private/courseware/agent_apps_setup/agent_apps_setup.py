@@ -161,7 +161,21 @@ privacy_policy,"GM collects only the data needed to service your vehicle and sup
 
 # COMMAND ----------
 
-spark.sql(f"CREATE CATALOG IF NOT EXISTS `{CATALOG}`")
+# Most lab metastores have a storage root, so a plain CREATE CATALOG works. Some metastores
+# ("Default Storage" / managed-storage metastores, common on Azure) reject CREATE CATALOG without an
+# explicit MANAGED LOCATION — even IF NOT EXISTS can fail there because the location is resolved
+# before the existence check. In that case, if the catalog was already created out-of-band, continue.
+try:
+    spark.sql(f"CREATE CATALOG IF NOT EXISTS `{CATALOG}`")
+except Exception as e:
+    if spark.sql(f"SHOW CATALOGS LIKE '{CATALOG}'").count() > 0:
+        print(f"  Catalog {CATALOG} already exists — continuing (create skipped: {str(e)[:140]})")
+    else:
+        raise RuntimeError(
+            f"CREATE CATALOG {CATALOG} failed and the catalog does not exist. This metastore may "
+            f"require an explicit MANAGED LOCATION (Default Storage). Create the catalog first "
+            f"(e.g. `databricks catalogs create {CATALOG} --storage-root <abfss/s3 path>`), then "
+            f"re-run this notebook. Original error: {e}")
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS `{CATALOG}`.`{SCHEMA}`")
 print(f"  Catalog and schema ready: {CATALOG}.{SCHEMA}")
 
