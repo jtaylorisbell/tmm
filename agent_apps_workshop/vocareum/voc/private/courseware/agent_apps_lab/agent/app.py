@@ -3,8 +3,9 @@
 Every DATA call (UC function tools, Vector Search) runs **on-behalf-of the signed-in user** via
 the `X-Forwarded-Access-Token` header — the app's service principal is granted NOTHING on the
 shared data, and UC governance (the PII column mask) follows the user automatically. The LLM
-runs as the app SP via Foundation Model APIs (pay-per-token, no grant); its serving endpoint is
-governed by **Unity AI Gateway** (inference-table payload logging, usage tracking, rate limit) —
+runs as the app SP via Foundation Model APIs (pay-per-token, no grant); the call is **routed through
+Unity AI Gateway** (base_url `{host}/ai-gateway/openai/v1`, not the legacy `/serving-endpoints`
+route) — inference-table payload logging, usage tracking, and a rate limit, all in Unity Catalog:
 the model path's counterpart to the OBO + UC mask on the data path. (Gateway *guardrails* are left
 off: they gate the chat and break a streaming agent — a Module 6 topic — see workshop setup Step 11.)
 
@@ -40,11 +41,13 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 # LLM: the Databricks-provided OpenAI client (a hand-built AsyncOpenAI base_url FAILS). Runs as
-# the app SP against LLM_ENDPOINT; FMAPI is pay-per-token, no grant needed. That serving endpoint
-# is governed by Unity AI Gateway (inference-table payload logging + usage/rate limits; guardrails
-# off — see setup Step 11) — configured once in workshop setup, transparent to this client. Data
-# tools stay OBO below.
-set_default_openai_client(AsyncDatabricksOpenAI())
+# the app SP against LLM_ENDPOINT; FMAPI is pay-per-token, no grant needed.
+# ROUTING — use_ai_gateway_native_api=True sends the client at the Unity AI Gateway's native
+# OpenAI-compatible API: base_url becomes {host}/ai-gateway/openai/v1 (POST .../chat/completions),
+# NOT the legacy per-endpoint {host}/serving-endpoints route. So every model call goes THROUGH the
+# gateway — payload logging + usage/rate limits in Unity Catalog (guardrails off; see setup Step 11).
+# Streaming and non-streaming both verified on this route. Data tools stay OBO below.
+set_default_openai_client(AsyncDatabricksOpenAI(use_ai_gateway_native_api=True))
 # chat_completions, NOT the Responses API — FMAPI does not support Responses passthrough for
 # several models.
 set_default_openai_api("chat_completions")
