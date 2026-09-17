@@ -55,7 +55,8 @@ That arc *is* the platform story: **Apps = runtime**, **OpenAI Agents SDK = brin
    agent (output guardrails are unsupported in streaming; the PII/safety guardrails block the
    repair-order lookup and false-positive on benign questions, surfacing as 500s). They're a Module 6
    capability with real trade-offs, not something to enable on this app.
-3. **The LLM is `databricks-gpt-5-4` on purpose** (set via `LLM_ENDPOINT` in `agent/app.yaml`). It's
+3. **The LLM is GPT-5.4 on purpose** — UC model slug `system.ai.gpt-5-4`, called via Unity AI Gateway
+   (`LLM_ENDPOINT` in `agent/app.yaml`; NOT the legacy serving-endpoint name `databricks-gpt-5-4`). It's
    the fastest reliable tool-caller **that still exhibits the planted warranty bug**. Some frontier
    models *self-correct* the bug — which would gut Modules 4–5. Great wrap-up color (see §6), but
    never swap the baseline model casually. Routing it through the AI Gateway does **not** change the
@@ -176,8 +177,9 @@ That arc *is* the platform story: **Apps = runtime**, **OpenAI Agents SDK = brin
   - The OBO heart: middleware captures **`X-Forwarded-Access-Token`** per request → every tool builds
     its `WorkspaceClient` with *the user's* token. "Your app's service principal is granted
     **nothing** on the data."
-  - The LLM is the one SP-side call: `AsyncDatabricksOpenAI()` against FMAPI (`databricks-gpt-5-4` via
-    `LLM_ENDPOINT`), pay-per-token — and that endpoint is **governed by Unity AI Gateway**.
+  - The LLM is the one SP-side call: `AsyncDatabricksOpenAI(use_ai_gateway_native_api=True)` (model
+    `system.ai.gpt-5-4` via `LLM_ENDPOINT`), pay-per-token — **routed through Unity AI Gateway**
+    (`{host}/ai-gateway/openai/v1`), not the legacy `/serving-endpoints` path.
   - Presenter color if asked: the deps are **pinned** (`databricks-openai==0.15.0`,
     `databricks-vectorsearch==0.73`) because newer/older combos can crash the Apps runtime at import.
 - **Watch-outs:** app names > 30 chars are rejected — use the printed `APP_NAME`. If Genie loops, the
@@ -332,7 +334,7 @@ bugs no prompt can fix." The judges catch all three systematically — Module 4'
 | Chat returns 500 | LLM wiring changed | `app.py` must keep `AsyncDatabricksOpenAI()` + `chat_completions` — don't let Genie rewrite the LLM client |
 | Genie deploy stalls / thrashes at a step | LLM variance | **Run All in `02_Deploy_App`** — idempotent, safe over a half-finished attempt; meanwhile keep the room on the reference app |
 | Chat header says **memory: off** | Lakebase unreachable, or the app SP's Postgres role isn't ready yet | chat still works single-turn; M1–M5 unaffected. **Re-run `02_Deploy_App` (Run All)** — it (re)creates the role and restarts the app; skip 5½ if Lakebase itself is down |
-| Warranty question answers "3 years" at **baseline** | model or prompt changed | restore `LLM_ENDPOINT: databricks-gpt-5-4` in `app.yaml`; the bug must be intact for M4–M5 |
+| Warranty question answers "3 years" at **baseline** | model or prompt changed | restore `LLM_ENDPOINT: system.ai.gpt-5-4` in `app.yaml`; the bug must be intact for M4–M5 |
 | No inference-table activity on the LLM endpoint | AI Gateway custom config wasn't applied (system endpoint) | non-fatal — usage tracking still exists via system tables; to get payload logging live, verify the endpoint took the config or create a workspace-owned serving endpoint (Step 11 comments) and point `LLM_ENDPOINT` at it |
 | Chat 500s or memory silently "off" after someone enabled AI Gateway **guardrails** | guardrails *gate* the chat: **output** guardrails are unsupported in streaming (break the streamed reply + memory), and the PII/safety guardrails block the RO lookup / false-positive on benign questions → 400 | **remove the `guardrails` block from the endpoint's `ai-gateway` config** (Step 11 ships without them on purpose). Guardrails are a Module 6 topic, not for this streaming app |
 | M5: `AttributeError: 'NoneType' ... 'info'` | autolog-disable line skipped (cells run out of order) | Run-All from a fresh kernel; `mlflow.openai.autolog(disable=True)` must precede `evaluate` |
