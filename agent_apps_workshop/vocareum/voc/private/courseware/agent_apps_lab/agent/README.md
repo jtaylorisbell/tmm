@@ -12,7 +12,8 @@ wired to the shared GM assets and designed so **you can deploy it with no admin 
   (Vector Search on `vehicle_docs_vs`).
 - **LLM** uses `databricks_openai.AsyncDatabricksOpenAI()` (the FMAPI-aware client — don't hand-build
   an `AsyncOpenAI(base_url=...)`); it runs as the app service principal (pay-per-token, no grant). Its
-  serving endpoint is governed by **Unity AI Gateway** (guardrails, payload logging, usage/rate limits).
+  serving endpoint is governed by **Unity AI Gateway** (inference-table payload logging, usage/rate
+  limits; guardrails intentionally off — they gate/stream-break this app, a Module 6 topic).
 - App-level `user_api_scopes` must be `[sql, vector-search]` (enables the OBO token).
 - **Streaming, visibly:** replies print token-by-token (SSE via `POST /chat/stream`) and tool
   calls appear as repair-order line items *while the agent works*. If a stream fails before anything

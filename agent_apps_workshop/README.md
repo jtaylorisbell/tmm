@@ -15,8 +15,8 @@ loop, in one sitting.
 tools via **UC Functions + Vector Search, all running on-behalf-of-user (OBO)** · conversation
 memory in **Lakebase** (managed Postgres) · LLM via **Foundation Model APIs** (`databricks-gpt-5`,
 swappable in `app.yaml`) governed by **Unity AI Gateway** · governance via **OBO + UC column masks**
-(data path) and **Unity AI Gateway** guardrails + payload logging (model path) · observability via
-**MLflow 3 tracing & evaluation**.
+(data path) and **Unity AI Gateway** inference-table logging + usage/rate limits (model path) ·
+observability via **MLflow 3 tracing & evaluation**.
 
 ---
 
@@ -42,9 +42,10 @@ swappable in `app.yaml`) governed by **Unity AI Gateway** · governance via **OB
   shared data, and Unity Catalog governance (the PII column mask) follows the user automatically.
   The LLM runs as the app SP on Foundation Model APIs (pay-per-token, no grant).
 - **The model path is governed too — by Unity AI Gateway.** The agent's serving endpoint is
-  configured with AI guardrails (PII + safety), inference-table payload logging, usage tracking, and
-  a rate limit — all in Unity Catalog. So *both* paths are governed: data via OBO + UC masks, model
-  via Unity AI Gateway.
+  configured with inference-table payload logging, usage tracking, and a rate limit — all in Unity
+  Catalog. So *both* paths are governed: data via OBO + UC masks, model via Unity AI Gateway.
+  (Gateway *guardrails* — PII/safety — are intentionally left off: they gate the chat and break a
+  streaming agent, so they're a Module 6 topic. See setup Step 11.)
 - **Conversation memory in Lakebase.** The app is created with a `postgres` resource; transcripts
   are written **as the app's own SP** into a per-app schema it owns. Memory is optional — if
   Lakebase is unreachable the chat degrades gracefully to single-turn.
@@ -94,8 +95,9 @@ agent_apps_workshop/
 - **Databricks Apps** with **User Authorization (OBO)** enabled
 - **Vector Search**, **Lakebase** (managed Postgres), and **Foundation Model APIs** (a `gpt-5`-class
   endpoint; swappable via `LLM_ENDPOINT` in `agent/app.yaml`)
-- **Unity AI Gateway** (to govern the LLM serving endpoint — guardrails, payload logging, usage/rate
-  limits; setup configures it best-effort and the lab still runs if it's unavailable)
+- **Unity AI Gateway** (to govern the LLM serving endpoint — inference-table payload logging, usage
+  tracking, rate limit; guardrails left off — they gate/stream-break this app, a Module 6 topic;
+  setup configures it best-effort and the lab still runs if it's unavailable)
 - **Genie Code** (the in-workspace coding agent) for the driven path — the click-through notebooks
   work without it
 

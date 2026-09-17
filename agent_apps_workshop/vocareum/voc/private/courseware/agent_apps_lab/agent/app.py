@@ -4,8 +4,9 @@ Every DATA call (UC function tools, Vector Search) runs **on-behalf-of the signe
 the `X-Forwarded-Access-Token` header — the app's service principal is granted NOTHING on the
 shared data, and UC governance (the PII column mask) follows the user automatically. The LLM
 runs as the app SP via Foundation Model APIs (pay-per-token, no grant); its serving endpoint is
-governed by **Unity AI Gateway** (guardrails, payload logging, usage tracking) — the model path's
-counterpart to the OBO + UC mask on the data path.
+governed by **Unity AI Gateway** (inference-table payload logging, usage tracking, rate limit) —
+the model path's counterpart to the OBO + UC mask on the data path. (Gateway *guardrails* are left
+off: they gate the chat and break a streaming agent — a Module 6 topic — see workshop setup Step 11.)
 
 Conversation memory: the app is created with a **`postgres` resource** (the shared Lakebase
 project); transcripts are written **as the app SP** into a per-app schema it owns. Memory is
@@ -40,8 +41,9 @@ from pydantic import BaseModel
 
 # LLM: the Databricks-provided OpenAI client (a hand-built AsyncOpenAI base_url FAILS). Runs as
 # the app SP against LLM_ENDPOINT; FMAPI is pay-per-token, no grant needed. That serving endpoint
-# is governed by Unity AI Gateway (guardrails + payload logging + usage/rate limits) — configured
-# once in workshop setup, transparent to this client. Data tools stay OBO below.
+# is governed by Unity AI Gateway (inference-table payload logging + usage/rate limits; guardrails
+# off — see setup Step 11) — configured once in workshop setup, transparent to this client. Data
+# tools stay OBO below.
 set_default_openai_client(AsyncDatabricksOpenAI())
 # chat_completions, NOT the Responses API — FMAPI does not support Responses passthrough for
 # several models.
@@ -52,7 +54,8 @@ set_tracing_disabled(True)
 CATALOG = os.getenv("WORKSHOP_CATALOG", "agent_apps_workshop")
 SCHEMA = os.getenv("WORKSHOP_SCHEMA", "shared")
 VS_INDEX = os.getenv("WORKSHOP_VS_INDEX", "vehicle_docs_vs")
-# Unity-AI-Gateway-governed serving endpoint (guardrails + payload logging + usage/rate limits).
+# Unity-AI-Gateway-governed serving endpoint (inference-table payload logging + usage/rate limits;
+# guardrails intentionally off — they gate/stream-break this app, see setup Step 11 / Module 6).
 LLM_ENDPOINT = os.getenv("LLM_ENDPOINT", "databricks-gpt-5-4")
 # Resolve the warehouse by NAME (portable); an explicit WAREHOUSE_ID env wins.
 WAREHOUSE_NAME = os.getenv("WAREHOUSE_NAME", "agent-apps-shared")
@@ -262,6 +265,16 @@ def _tool_calls(result) -> list[dict]:
     return calls
 
 
+def _friendly_error(e: Exception) -> str:
+    """Turn a model-side failure into a readable chat message, so a 400 never surfaces as a 500.
+    If the LLM endpoint has AI Gateway guardrails enabled, a triggered guardrail comes back as a
+    BadRequest whose body mentions 'guardrail'; everything else gets a generic, non-scary line."""
+    if "guardrail" in str(e).lower():
+        return ("⚠️ The model gateway blocked this message — an AI Gateway guardrail was triggered. "
+                "Try rephrasing your request.")
+    return "⚠️ The agent hit an error handling that request. Please try again or rephrase."
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -287,8 +300,12 @@ async def chat(req: ChatRequest):
             return {"response": result.final_output, "memory": "lakebase",
                     "tool_calls": _tool_calls(result)}
         except Exception as e:  # noqa: BLE001 — degrade gracefully, never fail the chat on memory
-            logger.warning("Lakebase memory failed mid-chat (%s) — retrying memoryless.", e)
-    result = await Runner.run(agent, req.message)
+            logger.warning("Chat with memory failed (%s) — retrying memoryless.", e)
+    try:
+        result = await Runner.run(agent, req.message)
+    except Exception as e:  # noqa: BLE001 — a model-side 400 (e.g. a gateway guardrail) must not 500
+        logger.warning("Agent run failed memoryless (%s) — returning a friendly error.", e)
+        return {"response": _friendly_error(e), "memory": "off", "tool_calls": []}
     return {"response": result.final_output, "memory": "off", "tool_calls": _tool_calls(result)}
 
 
@@ -336,10 +353,10 @@ async def chat_stream(req: ChatRequest):
                 yield _sse({"type": "done", "memory": "lakebase"})
                 return
             except Exception as e:  # noqa: BLE001
-                logger.warning("Lakebase memory failed mid-stream (%s) — %s.", e,
+                logger.warning("Streaming chat with memory failed (%s) — %s.", e,
                                "surfacing error" if emitted else "retrying memoryless")
                 if emitted:
-                    yield _sse({"type": "error", "detail": str(e)[:200]})
+                    yield _sse({"type": "error", "detail": _friendly_error(e)})
                     return
         try:
             result = Runner.run_streamed(agent, req.message)
@@ -347,7 +364,7 @@ async def chat_stream(req: ChatRequest):
                 yield _sse(ev)
             yield _sse({"type": "done", "memory": "off"})
         except Exception as e:  # noqa: BLE001
-            yield _sse({"type": "error", "detail": str(e)[:200]})
+            yield _sse({"type": "error", "detail": _friendly_error(e)})
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

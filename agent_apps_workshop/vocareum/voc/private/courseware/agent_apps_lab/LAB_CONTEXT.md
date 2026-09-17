@@ -18,8 +18,12 @@ from scratch.
 - UC function tools: `get_vehicle_details`, `get_service_status`, `get_warranty_policy`.
 - SQL warehouse named **`agent-apps-shared`** — resolve it **by name**, never hardcode an id.
 - A Unity Catalog column mask redacts `repair_orders` customer PII for non-admins (the governance story).
-- The agent's LLM serving endpoint is governed by **Unity AI Gateway** (guardrails, payload logging,
-  usage/rate limits) — set up in workshop provisioning; the agent code doesn't change for it.
+- The agent's LLM serving endpoint is governed by **Unity AI Gateway** (inference-table payload
+  logging, usage tracking, rate limit) — set up in workshop provisioning; the agent code doesn't
+  change for it. Gateway **guardrails are intentionally OFF**: they gate the chat and break a
+  streaming agent (output guardrails are unsupported in streaming; the PII/safety guardrails block
+  the repair-order lookup and false-positive on benign questions). Treat guardrails as a Module 6
+  topic — **do NOT add them** to make the app look "more governed."
 - A ready-to-run agent already lives in the participant's **`agent/` folder** — deploy and customize it.
 
 ## The one hard constraint — DATA access runs on-behalf-of-the-user (OBO)

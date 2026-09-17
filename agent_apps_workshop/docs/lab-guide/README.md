@@ -139,9 +139,12 @@ In the chat UI, replies **stream in live** — and each 🔧 tool call prints as
    ![Chat: PII redacted through the agent](img/06-chat-pii-redacted.png)
 
 3. **The model call is governed too.** Your agent's LLM endpoint runs behind **Unity AI Gateway** —
-   guardrails screen the request/response for PII and unsafe content, every call is logged to a
-   Unity Catalog inference table, and usage is tracked and rate-limited. Two paths, both governed in
-   Unity Catalog: your **data** via OBO + the column mask, your **model** via Unity AI Gateway.
+   every request/response is logged to a Unity Catalog inference table (an audit trail of exactly what
+   the model saw and said), and usage is tracked and rate-limited for cost control. Two paths, both
+   governed in Unity Catalog: your **data** via OBO + the column mask, your **model** via Unity AI
+   Gateway. *(Gateway can also enforce PII/safety **guardrails**, but those gate the chat and don't
+   fit a streaming assistant that legitimately returns admin-visible PII — so guardrails are a
+   Module 6 topic, not enabled here.)*
 
 4. **It remembers.** Ask *"and what was the total on that repair?"* — the header shows your session id,
    and every turn is stored in Lakebase under it.

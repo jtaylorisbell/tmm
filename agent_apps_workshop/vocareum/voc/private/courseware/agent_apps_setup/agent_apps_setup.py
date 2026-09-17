@@ -30,9 +30,10 @@
 # MAGIC 10. A shared autoscaling **Lakebase** project (`agent-apps-memory`), `users` CAN MANAGE on it
 # MAGIC     (so each student's app attaches it as a `postgres` resource — SP memory, per-app schema),
 # MAGIC     + a `users`-group Postgres role (students browse memory in the end-of-lab beat)
-# MAGIC 11. **Unity AI Gateway** config on the agent's LLM serving endpoint (guardrails: PII + safety,
-# MAGIC     inference-table payload logging, usage tracking, per-user rate limit) — governance for the
-# MAGIC     model path, complementing the OBO + UC column mask on the data path
+# MAGIC 11. **Unity AI Gateway** config on the agent's LLM serving endpoint (inference-table payload
+# MAGIC     logging, usage tracking, rate limit — guardrails intentionally left off; they gate/stream-
+# MAGIC     break this app, so they're a Module 6 topic) — governance for the model path, complementing
+# MAGIC     the OBO + UC column mask on the data path
 # MAGIC 12. **AI Dev Kit skills** distributed to `/Workspace/.assistant/skills/` so every student's
 # MAGIC     **Genie Code** can scaffold + deploy the agent App (Module 2) and evaluate it (Module 5)
 # MAGIC 13. A shared **lab-guide app** (`agent-lab-guide`) — the participant guide + field-guide deck,
@@ -698,10 +699,20 @@ except Exception as e:
 # MAGIC pay-per-token). We govern that model path with **Unity AI Gateway** — the counterpart to the
 # MAGIC OBO + UC column mask that governs the *data* path. On the endpoint the agent uses (`LLM_ENDPOINT`
 # MAGIC in `agent/app.yaml`) we enable, via `PUT /api/2.0/serving-endpoints/{name}/ai-gateway`:
-# MAGIC - **AI guardrails** — PII detection (mask) + safety on both request and response;
 # MAGIC - **Inference table** — full request/response payloads logged to a UC Delta table in `shared`;
 # MAGIC - **Usage tracking** — tokens / latency / cost to UC system tables;
 # MAGIC - **Rate limit** — a per-endpoint cap (the cost-control story).
+# MAGIC
+# MAGIC **On guardrails (PII/safety): intentionally NOT enabled here.** AI Gateway guardrails *gate* the
+# MAGIC chat, and that collides with this app three ways: (1) **output guardrails are unsupported in
+# MAGIC streaming mode** and the chat UI streams — they fail every streamed turn and silently break
+# MAGIC Lakebase memory; (2) the **output PII guardrail blocks the repair-order lookup**, whose result
+# MAGIC legitimately carries admin-visible PII that's already governed *per identity* by the UC column
+# MAGIC mask (Module 3) — a redundant second mask that only breaks the flow; (3) the **safety guardrail
+# MAGIC false-positives** on benign service questions and returns a 400 the app surfaces as a 500. So
+# MAGIC guardrails are taught as a **Module 6** AI-Gateway capability *with these real trade-offs*, while
+# MAGIC the governance students see live is OBO + the UC mask (data) plus inference-table logging + usage
+# MAGIC + rate limits (model). To demo guardrails live, put them on a non-streaming endpoint/path.
 # MAGIC
 # MAGIC Best-effort and **non-fatal**: usage tracking is on for FMAPI by default, and the lab runs even
 # MAGIC if the shared endpoint declines custom config. ⚠️ A *system-managed* pay-per-token endpoint may
@@ -716,6 +727,12 @@ LLM_ENDPOINT_NAME = "databricks-gpt-5-4"
 gateway_configured = False
 
 # Full desired config; we fall back to a reduced config if the platform rejects any piece.
+# NOTE — deliberately NO `guardrails` block. AI Gateway guardrails GATE the chat and conflict with
+# this streaming agent app: output guardrails are unsupported in streaming mode (they break the
+# streamed reply + Lakebase memory), the output PII guardrail blocks the repair-order lookup (whose
+# PII is already governed per-identity by the UC column mask), and the safety guardrail
+# false-positives on benign questions, returning a 400 the app surfaces as a 500. Guardrails are a
+# Module 6 capability instead. What we DO enable is transparent, non-gating model governance:
 _gw_full = {
     "usage_tracking_config": {"enabled": True},
     "inference_table_config": {
@@ -723,10 +740,6 @@ _gw_full = {
         "catalog_name": CATALOG,
         "schema_name": SCHEMA,
         "table_name_prefix": "gateway_llm",
-    },
-    "guardrails": {
-        "input": {"pii": {"behavior": "MASK"}, "safety": True},
-        "output": {"pii": {"behavior": "MASK"}, "safety": True},
     },
     "rate_limits": [{"calls": 1000, "renewal_period": "minute", "key": "endpoint"}],
 }
@@ -739,7 +752,8 @@ for _label, _body in (("full", _gw_full), ("reduced (no rate limit)", _gw_reduce
         w.api_client.do("PUT", _gw_path, body=_body)
         gateway_configured = True
         print(f"  Unity AI Gateway configured on '{LLM_ENDPOINT_NAME}' ({_label}): "
-              f"guardrails (PII+safety), inference table {CATALOG}.{SCHEMA}.gateway_llm_*, usage tracking.")
+              f"inference table {CATALOG}.{SCHEMA}.gateway_llm_*, usage tracking, rate limit "
+              f"(no guardrails — they gate/stream-break this app; taught in Module 6).")
         break
     except Exception as e:  # noqa: BLE001 — non-fatal; the lab runs without custom gateway config
         print(f"  Gateway config attempt ({_label}) did not apply: {e}")
@@ -1030,7 +1044,7 @@ print(f"  Lakebase:   project=agent-apps-memory branch=production "
       f"host={lakebase_conn_host or 'MISSING — agent runs memoryless'} "
       f"(users CAN_MANAGE for app resource attach + group role for browsing)")
 print(f"  AI Gateway: {LLM_ENDPOINT_NAME} -> "
-      f"{'configured (guardrails + inference table + usage tracking)' if gateway_configured else 'custom config NOT applied (non-fatal — see Step 11)'}")
+      f"{'configured (inference table + usage tracking + rate limit; no guardrails — see Step 11)' if gateway_configured else 'custom config NOT applied (non-fatal — see Step 11)'}")
 print(f"  Guide app:  {GUIDE_APP_NAME} -> {guide_app_url or 'FAILED (non-fatal)'} (users CAN_USE)")
 print(f"  Genie Code: {len(skills_present)} AI Dev Kit skills at {WORKSPACE_SKILLS_DIR} "
       f"(users CAN_READ granted). Lab context → agent_apps_lab/LAB_CONTEXT.md (attach per-session).")

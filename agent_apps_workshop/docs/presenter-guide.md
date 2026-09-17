@@ -48,10 +48,13 @@ That arc *is* the platform story: **Apps = runtime**, **OpenAI Agents SDK = brin
    project as a `postgres` resource (setup grants `users` CAN MANAGE on the project to allow it),
    which auto-creates the app SP's database role; transcripts land in a per-app schema the SP owns.
 2. **The model call is governed by Unity AI Gateway.** The one SP-side call (the LLM, on Foundation
-   Model APIs) runs against a serving endpoint that workshop setup configured with **AI guardrails
-   (PII + safety), inference-table payload logging, usage tracking, and a rate limit** — all in
-   Unity Catalog. So governance isn't only about the data: the *model* path is governed too. Call
-   this out in Module 3 and Module 6.
+   Model APIs) runs against a serving endpoint that workshop setup configured with **inference-table
+   payload logging, usage tracking, and a rate limit** — all in Unity Catalog. So governance isn't
+   only about the data: the *model* path is governed too. Call this out in Module 3 and Module 6.
+   **Guardrails (PII/safety) are intentionally OFF** — they *gate* the chat and break a streaming
+   agent (output guardrails are unsupported in streaming; the PII/safety guardrails block the
+   repair-order lookup and false-positive on benign questions, surfacing as 500s). They're a Module 6
+   capability with real trade-offs, not something to enable on this app.
 3. **The LLM is `databricks-gpt-5-4` on purpose** (set via `LLM_ENDPOINT` in `agent/app.yaml`). It's
    the fastest reliable tool-caller **that still exhibits the planted warranty bug**. Some frontier
    models *self-correct* the bug — which would gut Modules 4–5. Great wrap-up color (see §6), but
@@ -75,11 +78,11 @@ That arc *is* the platform story: **Apps = runtime**, **OpenAI Agents SDK = brin
     **ONLINE**, SQL warehouse **`agent-apps-shared`** (resolved by name, never by id).
   - UC **column mask** on `repair_orders.customer_email` + `customer_address` (non-admins see
     `***REDACTED***`).
-  - **Unity AI Gateway** step (Step 11): the log says "configured" (guardrails + inference table +
-    usage tracking) or, if the shared endpoint declined custom config, a clear non-fatal note. Either
-    way usage tracking is available; the lab runs regardless. If you want the full guardrails/logging
-    story live, verify the endpoint took the config (or create a workspace-owned endpoint — see the
-    Step 11 comments).
+  - **Unity AI Gateway** step (Step 11): the log says "configured" (inference table + usage tracking
+    + rate limit; **no guardrails** — they gate/stream-break this app) or, if the shared endpoint
+    declined custom config, a clear non-fatal note. Either way usage tracking is available; the lab
+    runs regardless. If you want the payload-logging story live, verify the endpoint took the config
+    (or create a workspace-owned endpoint — see the Step 11 comments).
   - Genie Code skills distributed **and `users` granted CAN_READ on `/Workspace/.assistant`** —
     without that grant students' Genie Code sees **zero** skills.
   - Lakebase project **`agent-apps-memory`** ready (endpoint host in the log), **`users` granted
@@ -199,9 +202,11 @@ That arc *is* the platform story: **Apps = runtime**, **OpenAI Agents SDK = brin
      in Unity Catalog; nobody wrote redaction logic in the app. That's the **data path**, governed by
      OBO + UC."
   2. "And the **model path** is governed too: this agent's LLM endpoint runs behind **Unity AI
-     Gateway** — guardrails screen the request/response for PII and unsafe content, every call is
-     logged to a UC inference table, and usage is tracked and rate-limited. Both paths, governed in
-     Unity Catalog — governance you didn't have to build."
+     Gateway** — every request/response is logged to a UC inference table (an audit trail of what the
+     model saw and said), and usage is tracked and rate-limited. Both paths, governed in Unity
+     Catalog — governance you didn't have to build." *(If asked about guardrails: Gateway can also
+     enforce PII/safety guardrails, but they gate the chat and don't fit a streaming assistant that
+     legitimately returns admin-visible PII — a Module 6 topic; see Step 11.)*
 - **Watch-outs:** the consent screen reappearing for a colleague's app is expected (per user+app). If
   a chat errors, `https://<app-url>/logz` is the first stop.
 
@@ -282,11 +287,12 @@ That arc *is* the platform story: **Apps = runtime**, **OpenAI Agents SDK = brin
   - **Judges as regression gates:** re-run the eval on every prompt/data/model change; fail the
     pipeline if `warranty_accuracy` drops. "Your evals are unit tests for agent behavior."
   - **Traces in Unity Catalog:** production traces land governed and queryable, debuggable with Genie.
-  - **Unity AI Gateway in production:** the guardrails, inference-table logging, usage tracking, and
-    rate limit you saw in Module 3 are your production controls — add **spend caps** and **PII/safety
-    guardrails as policy** across every model your agents call. Three observability surfaces now:
-    MLflow traces (agent behavior), Lakebase (conversation memory), and AI Gateway inference logs
-    (model I/O).
+  - **Unity AI Gateway in production:** the inference-table logging, usage tracking, and rate limit
+    you saw in Module 3 are your production controls — and in production you'd add **spend caps** and
+    **PII/safety guardrails as policy** across every model your agents call. (Guardrails *gate* the
+    chat, so they fit a non-streaming or batch path; we left them off this streaming assistant — that
+    trade-off is itself a production lesson.) Three observability surfaces now: MLflow traces (agent
+    behavior), Lakebase (conversation memory), and AI Gateway inference logs (model I/O).
   - **The model-portability beat:** "Swapping the model is a one-line `app.yaml` change. When we built
     this lab one frontier model **self-corrected the planted warranty bug**; others failed differently.
     Same agent, wildly different behavior — *that's* why you evaluate before you swap, and why you route
@@ -327,7 +333,8 @@ bugs no prompt can fix." The judges catch all three systematically — Module 4'
 | Genie deploy stalls / thrashes at a step | LLM variance | **Run All in `02_Deploy_App`** — idempotent, safe over a half-finished attempt; meanwhile keep the room on the reference app |
 | Chat header says **memory: off** | Lakebase unreachable, or the app SP's Postgres role isn't ready yet | chat still works single-turn; M1–M5 unaffected. **Re-run `02_Deploy_App` (Run All)** — it (re)creates the role and restarts the app; skip 5½ if Lakebase itself is down |
 | Warranty question answers "3 years" at **baseline** | model or prompt changed | restore `LLM_ENDPOINT: databricks-gpt-5-4` in `app.yaml`; the bug must be intact for M4–M5 |
-| No inference-table / guardrail activity on the LLM endpoint | AI Gateway custom config wasn't applied (system endpoint) | non-fatal — usage tracking still exists via system tables; to demo guardrails/logging live, create a workspace-owned serving endpoint (Step 11 comments) and point `LLM_ENDPOINT` at it |
+| No inference-table activity on the LLM endpoint | AI Gateway custom config wasn't applied (system endpoint) | non-fatal — usage tracking still exists via system tables; to get payload logging live, verify the endpoint took the config or create a workspace-owned serving endpoint (Step 11 comments) and point `LLM_ENDPOINT` at it |
+| Chat 500s or memory silently "off" after someone enabled AI Gateway **guardrails** | guardrails *gate* the chat: **output** guardrails are unsupported in streaming (break the streamed reply + memory), and the PII/safety guardrails block the RO lookup / false-positive on benign questions → 400 | **remove the `guardrails` block from the endpoint's `ai-gateway` config** (Step 11 ships without them on purpose). Guardrails are a Module 6 topic, not for this streaming app |
 | M5: `AttributeError: 'NoneType' ... 'info'` | autolog-disable line skipped (cells run out of order) | Run-All from a fresh kernel; `mlflow.openai.autolog(disable=True)` must precede `evaluate` |
 | M5: `asyncio.run() cannot be called…` | `nest_asyncio` cell didn't run post-restart | run cells in order from the top |
 | M5: warranty doesn't flip after a custom fix | agent passes a vehicle name to `get_warranty_policy` | the tool takes a **category** (`'warranty'`); read the trace, fix the instruction |
@@ -343,9 +350,11 @@ bugs no prompt can fix." The judges catch all three systematically — Module 4'
   keeps the bug; some frontier models self-correct the warranty bug (which would break the lab, but
   *makes* the M6 story); others fall over on the Agents-SDK chat-completions path. Any model swap must
   re-verify the baseline still says "6-year," and re-verify the endpoint's AI Gateway config.
-- **Guardrails deep-dive:** show the AI Gateway inference table filling up in `agent_apps_workshop.shared`
-  (payload logging), or a PII/safety guardrail firing on a deliberately unsafe prompt. Good advanced-room
-  material; keep it self-serve so it doesn't eat the 40-minute budget.
+- **AI Gateway deep-dive:** show the inference table filling up in `agent_apps_workshop.shared`
+  (payload logging — every model request/response, live). To demo **guardrails** firing (PII/safety),
+  enable them on a *non-streaming* endpoint and query it directly — they're deliberately off on the
+  app's endpoint because they gate/stream-break the chat (see Step 11). Good advanced-room material;
+  keep it self-serve so it doesn't eat the 40-minute budget.
 - **Eval-driven model swap (advanced):** change `LLM_ENDPOINT`, redeploy via Genie, re-run
   `05_Evaluate_and_Fix` against the new model, compare runs in MLflow.
 - **Custom MCP server on Apps**, **Supervisor API**, **TypeScript path** — natural follow-on
