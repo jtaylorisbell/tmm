@@ -24,8 +24,9 @@ env:
     value: "agent-apps-shared"   # setup creates this canonical name; the app resolves the id at runtime
                                  # (portable across workspaces — no hardcoded id). Or set WAREHOUSE_ID to pin one.
   - name: LLM_ENDPOINT
-    value: "databricks-gpt-5-4"   # Unity-AI-Gateway-governed serving endpoint (payload logging +
-                                  # usage/rate limits; guardrails off — see setup Step 11).
+    value: "system.ai.gpt-5-4"    # UC model slug, called via Unity AI Gateway (/ai-gateway/openai/v1
+                                  # — see the routing in app.py). NOT the legacy serving-endpoint name
+                                  # `databricks-gpt-5-4`. GPT-5.4 (resolves to gpt-5.4-2026-03-05).
                                   # bake-off 2026-06-09: fastest reliable tool-caller that still
                                   # exhibits the planted warranty bug (sonnet-4-6 self-corrected it,
                                   # gutting M4/M5; gemini-3-5-flash 400s on the Agents SDK path).

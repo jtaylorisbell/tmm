@@ -57,9 +57,10 @@ set_tracing_disabled(True)
 CATALOG = os.getenv("WORKSHOP_CATALOG", "agent_apps_workshop")
 SCHEMA = os.getenv("WORKSHOP_SCHEMA", "shared")
 VS_INDEX = os.getenv("WORKSHOP_VS_INDEX", "vehicle_docs_vs")
-# Unity-AI-Gateway-governed serving endpoint (inference-table payload logging + usage/rate limits;
-# guardrails intentionally off — they gate/stream-break this app, see setup Step 11 / Module 6).
-LLM_ENDPOINT = os.getenv("LLM_ENDPOINT", "databricks-gpt-5-4")
+# The model the agent calls: a UC model slug (system.ai.gpt-5-4), sent as the `model` on the Unity
+# AI Gateway route configured above (/ai-gateway/openai/v1). NOT the legacy serving-endpoint name
+# `databricks-gpt-5-4`. (Var kept as LLM_ENDPOINT for compatibility with the eval notebook.)
+LLM_ENDPOINT = os.getenv("LLM_ENDPOINT", "system.ai.gpt-5-4")
 # Resolve the warehouse by NAME (portable); an explicit WAREHOUSE_ID env wins.
 WAREHOUSE_NAME = os.getenv("WAREHOUSE_NAME", "agent-apps-shared")
 _WAREHOUSE_ID = os.getenv("WAREHOUSE_ID", "")
