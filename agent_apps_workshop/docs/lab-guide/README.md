@@ -1,6 +1,6 @@
 # 🛠️ Build a Custom AI Agent on Databricks Apps — Participant Guide
 
-### From Prompt to Production · Built for General Motors · ~40 min
+### From Prompt to Production · Built for General Motors · ~45 min
 
 You're a data engineer at **General Motors** standing up an AI **dealer service assistant**. You'll
 **build** it on Databricks Apps, **govern** it, deliberately **break** it, **measure** the breakage
@@ -174,35 +174,48 @@ lesson** — an agent is only as good as *which source it trusts*. Gut feel says
 
 ---
 
-## Module 5 — Evaluate & fix (~10 min)
+## Module 5 — Evaluate & fix (~12 min)
 
 1. **Open `agent_apps_lab/05_Evaluate_and_Fix` → Run all.** It rebuilds your agent in-process
-   (tools still OBO as you), runs a 5-question eval, and scores it with **MLflow `Guidelines`
-   LLM judges**.
+   (tools still OBO as you), runs an **8-question eval** scored by **six MLflow `Guidelines`
+   LLM judges**, then repeats with the fixed prompt.
 
-2. **Read the results in MLflow:** each eval cell prints **"Logged 1 run to an experiment in
-   MLflow"** — open the experiment's **Evaluation runs** tab and compare:
+2. **Read the results in MLflow:** open the experiment's **Evaluation runs** tab and compare
+   baseline vs fixed:
 
-   | judge | baseline | fixed |
-   |---|---|---|
-   | **warranty_accuracy** | **0.6–0.8 ❌** | **1.0 ✅** |
-   | availability_accuracy | 1.0 | 1.0 *(the contrast case — green both sides)* |
-   | policy_grounded | 1.0 | ~0.8\* |
+   | judge | baseline | fixed | what it catches |
+   |---|---|---|---|
+   | **warranty_accuracy** | **0.88 ❌** | **1.0 ✅** | the 6-year brochure lie |
+   | **pii_protected** | **0.88 ❌** | **1.0 ✅** | reading back a customer's email/address |
+   | **no_fabrication** | 0.75–1.0 | 1.0 | inventing specs for a car we don't sell |
+   | availability_accuracy | 1.0 | 1.0 | discontinued Camaro (catalog protects) |
+   | coverage_reasoning | 1.0 | 1.0 | "will I be charged?" (recall = free) |
+   | policy_grounded | 1.0 | 1.0\* | over-permissive loyalty policy |
 
    ![MLflow evaluation runs: baseline vs fixed](img/08-eval-baseline-vs-fixed.png)
 
-   The "fix" is a **prompt change** — the warranty judge flips from failing to passing, with
-   per-row answers and judge rationales as **real traces**. `availability_accuracy` stays green on
-   *both* sides — that's the Camaro contrast from Module 4: the catalog already protects the agent, so
-   there's nothing to fix. Not every risk is a live failure.
+   The "fix" is a **prompt change** — **warranty** and **pii_protected** flip ❌→✅ with per-row
+   answers and judge rationales as **real traces**. The green controls prove behavior you can't
+   eyeball: the catalog protects availability, and the recall-coverage question reasons correctly.
 
-   > \* `policy_grounded` can stay dipped after the fix — that bug lives in the **data** (an
-   > over-permissive loyalty service policy). Some agent bugs are prompt bugs; others are data bugs
-   > no prompt will fix.
+   > \* **`policy_grounded`** is usually green — the models *resist* the planted over-permissive
+   > "loyalty goodwill" policy (good!). That's a real lesson: bad data in your knowledge base is a
+   > latent risk, but a capable, well-instructed agent cross-references the official policy. Watch the
+   > **cheap model** wobble on it in step 4. **`pii_protected`** only fails at baseline if you're a
+   > workspace **admin** (the column mask exempts you); as a non-admin the mask redacts the data so the
+   > agent literally can't leak it — governance you didn't build.
 
 3. **Make it yours (optional):** edit `fixed_instructions`, re-run, then ask Genie to *"update
    the agent instructions to the fixed version and redeploy"* — your app now answers **3 years /
    36,000 miles**.
+
+4. **The model axis — evaluate before you swap (~2 min).** Section 8 runs the same two dividing
+   questions across **five models** (the incumbent GPT-5.4, three `gpt-5-6` variants, and a cheap
+   `gpt-5-nano`). Every model trips the **warranty** brochure at baseline — the bug isn't
+   model-specific. But on the **loyalty** bait, the bigger models refuse while **gpt-5-nano** is the
+   unpredictable one: *capability buys reliability and safety.* The full 5-model × baseline/fixed grid
+   is pre-run in the experiment (Section 9) — "swap the model" is one line in `app.yaml`, but the grid
+   is why you **evaluate first**.
 
 ---
 

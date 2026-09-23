@@ -1,6 +1,6 @@
 # 🛠️ Build a Custom AI Agent on Databricks Apps — From Prompt to Production
 
-A **~40-minute, coding-agent-driven** hands-on workshop, **adapted for General Motors**.
+A **~45-minute, coding-agent-driven** hands-on workshop, **adapted for General Motors**.
 Participants build a custom AI **dealer service assistant** for **GM** (vehicles across Chevrolet,
 GMC, Buick, and Cadillac; service repair orders; warranty & recall policies), deploy it live on
 **Databricks Apps**, govern it, deliberately **break** it on planted data bugs, **measure** the
@@ -29,7 +29,7 @@ observability via **MLflow 3 tracing & evaluation**.
 | 2 | **Build & deploy** | One plain-English prompt → Genie deploys your own app (`sql` + `vector-search` scopes + a `postgres` memory resource, **zero SP grants on the data**) |
 | 3 | **Govern with OBO** | The same column mask follows your identity *through the deployed app* — plus **Unity AI Gateway** governs the model call. Governance you didn't build |
 | 4 | **Break it** | Chat with the agent and surface the planted quality bugs (the Escalade warranty answer is the star) |
-| 5 | **Evaluate & fix** | MLflow **LLM judges** → baseline fails → fix the prompt → re-run → the score flips, with real traces |
+| 5 | **Evaluate & fix** | 8-question eval, **6 MLflow LLM judges** → baseline fails → fix the prompt → score flips → then a **5-model axis** ("evaluate before you swap") |
 | 5½ | **Visit the memory** | Query your own chat transcript out of Lakebase (Postgres) — and the app's **≡ Journal** reads the same tables |
 | 6 | **Productionize** | Recap: package as a Databricks Asset Bundle, traces in UC, judges as CI regression gates, AI Gateway guardrails + spend caps |
 
@@ -58,9 +58,11 @@ observability via **MLflow 3 tracing & evaluation**.
   3 yr / 36,000 mi). Only the **warranty** one becomes a failure — warranty length isn't in the vehicle
   catalog, so the agent falls back to the lying brochure and reliably flips ❌→✅ after the prompt fix.
   The **availability** one is the *control*: availability **is** in the catalog, so the agent already
-  answers it correctly (`availability_accuracy` is green on both runs). A third issue — an
-  over-permissive loyalty service policy — is a **data** bug no prompt fully fixes. A good agent trusts
-  the authoritative catalog/policy over marketing prose; the evals measure exactly which source it used.
+  answers it correctly (`availability_accuracy` is green on both runs). Module 5 adds more risks —
+  **PII disclosure** under pressure (the fix flips it), **fabrication** for a car not in the catalog,
+  and an **over-permissive loyalty policy** the models largely *resist* (the cheap model on the model
+  axis is the wobbly one — capability buys reliability). A good agent trusts the authoritative
+  catalog/policy over marketing prose; the evals measure exactly which source it used, across models.
 
 ---
 

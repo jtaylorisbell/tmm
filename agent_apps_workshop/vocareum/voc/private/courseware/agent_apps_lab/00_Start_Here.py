@@ -1,7 +1,7 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # 🛠️ Build a Custom AI Agent on Databricks Apps — *Start Here*
-# MAGIC ### From Prompt to Production · Built for General Motors · ~40 min
+# MAGIC ### From Prompt to Production · Built for General Motors · ~45 min
 # MAGIC
 # MAGIC You're a data engineer at **General Motors** standing up an AI **dealer service assistant** —
 # MAGIC vehicles, repair orders, warranty/recall policies: **build** it on Databricks Apps, **govern**
@@ -114,7 +114,7 @@ if GUIDE_URL:
 # MAGIC | 2 | **Build & deploy the agent** | Direct Genie Code to deploy the `agent/` starter as your own **Databricks App** — its tools run **on-behalf-of-you (OBO)**. (Fallback: **`02_Deploy_App`** → Run All.) |
 # MAGIC | 3 | **Govern with OBO** | Because your agent runs **on-behalf-of-you**, the UC **column mask** auto-redacts customer PII in the repair-order lookup for non-admins — see it live. Plus **Unity AI Gateway** governs the model call. |
 # MAGIC | 4 | **Break it** | Chat with your agent and surface the planted quality bugs. |
-# MAGIC | 5 | **Evaluate & fix** | Open **`05_Evaluate_and_Fix`** (ready to run) — **MLflow LLM judges** → baseline → fix the prompt → re-eval → **prove** the gain. |
+# MAGIC | 5 | **Evaluate & fix** | Open **`05_Evaluate_and_Fix`** (ready to run) — **6 MLflow LLM judges** → baseline → fix the prompt → re-eval → **prove** the gain → then a **5-model axis** (evaluate before you swap). |
 # MAGIC | 5½ | **Visit your agent's memory** | **Compute → Lakebase → Open Lakebase** → project "Agent Apps Workshop Memory" → SQL Editor → query `agent_messages` in **your app's schema** (printed above) — every chat is there. |
 # MAGIC | 6 | **Productionize** | Recap the **DABs** deploy + CI/CD; traces in UC; **AI Gateway** guardrails + spend caps; debug with Genie. |
 
