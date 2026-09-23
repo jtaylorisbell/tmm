@@ -35,9 +35,20 @@
 import asyncio
 import os
 import sys
+import threading
 
 import nest_asyncio
-nest_asyncio.apply()  # the agent is async; this lets asyncio.run(...) work inside the notebook
+nest_asyncio.apply()  # lets asyncio.run(...) work inside the notebook if other cells need it
+
+# ONE dedicated event loop for every agent call, running on a background thread.
+# Why: app.py creates a module-level AsyncDatabricksOpenAI client whose asyncio primitives bind to
+# the FIRST event loop that uses them. mlflow.genai.evaluate calls predict_fn from a THREAD POOL, and
+# a per-call asyncio.run() would spin up a new loop each time — so the shared client gets touched from
+# a loop it wasn't bound to and throws "Event is bound to a different event loop" (it hit whichever
+# row lost the race — often the Camaro row, which makes an extra tool round-trip). Pinning all
+# coroutines to this single loop keeps the client on one loop no matter how evaluate threads the rows.
+_AGENT_LOOP = asyncio.new_event_loop()
+threading.Thread(target=_AGENT_LOOP.run_forever, daemon=True).start()
 
 # Import the shipped agent (app.py) from your agent/ folder.
 _email = spark.sql("SELECT current_user() AS u").collect()[0]["u"]
@@ -73,10 +84,14 @@ def make_agent(instructions: str) -> Agent:
 
 
 def ask(agent: Agent, question: str) -> str:
+    # Run on the single shared loop (see _AGENT_LOOP above) via run_coroutine_threadsafe, so the
+    # shared async client is only ever used from that one loop — no cross-event-loop errors even
+    # though evaluate calls this from worker threads.
     # An LLM round-trip can occasionally return an EMPTY final_output.
     # Retry; if still empty, return a visible marker so the judge fails the row loudly.
     for _ in range(3):
-        out = asyncio.run(Runner.run(agent, question)).final_output
+        fut = asyncio.run_coroutine_threadsafe(Runner.run(agent, question), _AGENT_LOOP)
+        out = fut.result().final_output
         if out and str(out).strip():
             return str(out)
     return "(the agent returned an empty response after 3 attempts)"
