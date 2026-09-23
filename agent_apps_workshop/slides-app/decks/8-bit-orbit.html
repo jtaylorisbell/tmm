@@ -549,23 +549,114 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
     <div class="slide-content" style="justify-content: center;">
         <div class="reveal r1" style="margin-bottom: 20px;"><span class="label-pill cyan">The Build</span></div>
         <h2 class="headline reveal r2" style="margin-bottom: 40px;">What you're building — zero grants on the shared data</h2>
-        <div class="reveal r3" style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 24px; margin-bottom: 44px;">
-            <div class="dark-card bracketed" style="padding: 24px 20px;">
-                <div class="subhead" style="color: var(--neon-cyan); margin-bottom: 12px;">THE RUNTIME</div>
-                <p class="body-text" style="font-size: 15px;">FastAPI + OpenAI Agents SDK, deployed as a <strong style="color:var(--white);">Databricks App</strong> by <strong style="color:var(--white);">Genie Code</strong> running the shipped <span style="font-family: var(--font-hud); font-size: 13px;">02_Deploy_App</span> recipe — one plain-English prompt. (No Genie needed: Run All on that notebook does the same.)</p>
-            </div>
-            <div class="dark-card bracketed pink" style="padding: 24px 20px;">
-                <div class="subhead" style="color: var(--neon-pink); margin-bottom: 12px;">THE TOOLS — OBO</div>
-                <p class="body-text" style="font-size: 15px;">UC functions over a shared SQL warehouse + Vector Search, all called with <em>your</em> forwarded token (<span style="font-family: var(--font-hud); font-size: 13px;">X-Forwarded-Access-Token</span>). Scopes: <span style="font-family: var(--font-hud); font-size: 13px;">sql · vector-search</span>.</p>
-            </div>
-            <div class="dark-card bracketed" style="padding: 24px 20px;">
-                <div class="subhead" style="color: var(--neon-cyan); margin-bottom: 12px;">THE MEMORY</div>
-                <p class="body-text" style="font-size: 15px;">A <strong style="color:var(--white);">Lakebase resource</strong> attached at deploy: every chat turn lands in managed Postgres, written by the app's own SP into a schema <em>it owns</em> (<span style="font-family: var(--font-hud); font-size: 13px;">memory_&lt;your-app&gt;</span>) — the documented production pattern.</p>
-            </div>
-            <div class="dark-card bracketed yellow" style="padding: 24px 20px;">
-                <div class="subhead" style="color: var(--neon-yellow); margin-bottom: 12px;">THE LLM — AI GATEWAY</div>
-                <p class="body-text" style="font-size: 15px;">Foundation Model APIs, pay-per-token — the app's only service-principal call. Its endpoint is governed by <strong style="color:var(--white);">Unity AI Gateway</strong>: payload logging to a UC inference table, usage &amp; rate limits. (Guardrails are a Module 6 add-on — they gate a streaming chat.) Swap models with one line in <span style="font-family: var(--font-hud); font-size: 13px;">app.yaml</span>.</p>
-            </div>
+        <!-- === ARCHITECTURE DIAGRAM — the OBO mechanism, in 8-Bit Orbit iconography.
+                 Pink = "as the signed-in user (OBO)"; cyan/yellow = "as the app's service
+                 principal". Everything snaps to the 4px unit; colors are theme tokens. === -->
+        <div class="reveal r3" style="margin-bottom: 28px;">
+        <svg viewBox="0 0 1728 548" style="width:100%; height:auto; display:block; overflow:visible;" role="img"
+             aria-label="Architecture: the user's token flows to the Databricks App, which calls data tools as you (OBO) and memory plus the LLM as its own service principal.">
+            <style>
+                .n-box{ fill:rgba(15,27,61,0.65); stroke-width:2; }
+                .n-sh { fill:var(--deep-navy); opacity:0.5; }
+                .brk  { fill:none; stroke-width:4; }
+                .rail { fill:none; stroke-width:4; stroke-dasharray:16 8; }
+                .ttl  { font-family:'Tektur',cursive; font-weight:700; }
+                .sub  { font-family:'Chakra Petch',sans-serif; fill:rgba(255,255,255,0.74); }
+                .hud  { font-family:'Space Mono',monospace; letter-spacing:0.03em; }
+                .dim  { fill:rgba(255,255,255,0.5); }
+                .lgd  { font-family:'Space Mono',monospace; font-size:13px; fill:rgba(255,255,255,0.82); }
+                .s-cyan{stroke:var(--neon-cyan);}   .f-cyan{fill:var(--neon-cyan);}
+                .s-pink{stroke:var(--neon-pink);}   .f-pink{fill:var(--neon-pink);}
+                .s-yellow{stroke:var(--neon-yellow);} .f-yellow{fill:var(--neon-yellow);}
+            </style>
+
+            <!-- ===== connector rails (drawn first, behind the nodes) ===== -->
+            <!-- YOU -> APP : the forwarded user token -->
+            <path class="rail s-pink" d="M214,290 H544"/>
+            <polygon class="f-pink" points="544,280 562,290 544,300"/>
+            <text class="hud f-pink" x="387" y="278" font-size="13" text-anchor="middle">X-Forwarded-Access-Token</text>
+            <!-- APP -> DATA : still as YOU (OBO) -->
+            <path class="rail s-pink" d="M940,214 H1060 V83 H1174"/>
+            <polygon class="f-pink" points="1174,73 1192,83 1174,93"/>
+            <text class="hud f-pink" x="1002" y="202" font-size="13" text-anchor="middle">OBO · as YOU</text>
+            <!-- APP -> MEMORY : as the app SP -->
+            <path class="rail s-cyan" d="M940,285 H1090 V265 H1174"/>
+            <polygon class="f-cyan" points="1174,255 1192,265 1174,275"/>
+            <text class="hud f-cyan" x="1048" y="253" font-size="13" text-anchor="middle">as app SP</text>
+            <!-- APP -> LLM : as the app SP -->
+            <path class="rail s-yellow" d="M940,356 H1060 V447 H1174"/>
+            <polygon class="f-yellow" points="1174,437 1192,447 1174,457"/>
+            <text class="hud f-yellow" x="1002" y="435" font-size="13" text-anchor="middle">as app SP</text>
+
+            <!-- ===== YOU (pink) ===== -->
+            <rect class="n-sh"  x="8"  y="204" width="214" height="168"/>
+            <rect class="n-box s-pink" x="0" y="196" width="214" height="168"/>
+            <path class="brk s-pink" d="M0,216 V196 H20"/><path class="brk s-pink" d="M214,344 V364 H194"/>
+            <rect class="f-pink" x="94" y="236" width="26" height="26"/>
+            <rect class="f-pink" x="82" y="266" width="50" height="26"/>
+            <text class="ttl f-pink" x="107" y="330" font-size="24" text-anchor="middle">YOU</text>
+            <text class="sub" x="107" y="352" font-size="13" text-anchor="middle">the signed-in user</text>
+
+            <!-- ===== DATABRICKS APP (cyan, the runtime) ===== -->
+            <rect class="n-sh"  x="568" y="158" width="380" height="270"/>
+            <rect class="n-box s-cyan" x="560" y="150" width="380" height="270"/>
+            <path class="brk s-cyan" d="M560,170 V150 H580"/><path class="brk s-cyan" d="M940,400 V420 H920"/>
+            <rect class="n-box s-cyan" x="708" y="178" width="84" height="56"/>
+            <rect class="f-cyan" x="708" y="178" width="84" height="10"/>
+            <text class="hud f-cyan" x="750" y="216" font-size="17" text-anchor="middle">&lt;/&gt;</text>
+            <rect class="f-cyan" x="742" y="234" width="16" height="8"/>
+            <rect class="f-cyan" x="726" y="242" width="48" height="6"/>
+            <text class="ttl f-cyan" x="750" y="278" font-size="23" text-anchor="middle">DATABRICKS APP</text>
+            <text class="sub" x="750" y="302" font-size="14" text-anchor="middle">FastAPI · OpenAI Agents SDK</text>
+            <text class="hud dim" x="750" y="324" font-size="12" text-anchor="middle">deployed by Genie Code · 02_Deploy_App</text>
+            <text class="hud dim" x="750" y="356" font-size="12" text-anchor="middle">one app · two identities →</text>
+
+            <!-- ===== TOOLS — DATA (pink, OBO) ===== -->
+            <rect class="n-sh"  x="1188" y="16" width="540" height="150"/>
+            <rect class="n-box s-pink" x="1180" y="8" width="540" height="150"/>
+            <path class="brk s-pink" d="M1180,28 V8 H1200"/><path class="brk s-pink" d="M1720,138 V158 H1700"/>
+            <!-- table glyph -->
+            <g class="s-pink" fill="none" stroke-width="2">
+                <rect x="1212" y="52" width="16" height="16"/><rect x="1232" y="52" width="16" height="16"/><rect x="1252" y="52" width="16" height="16"/>
+                <rect x="1212" y="72" width="16" height="16"/><rect x="1232" y="72" width="16" height="16"/><rect x="1252" y="72" width="16" height="16"/>
+            </g>
+            <circle class="s-pink" cx="1292" cy="92" r="12" fill="none" stroke-width="3"/>
+            <line class="s-pink" x1="1301" y1="101" x2="1312" y2="112" stroke-width="4"/>
+            <text class="ttl f-pink" x="1344" y="52" font-size="19">TOOLS — DATA</text>
+            <text class="sub" x="1344" y="78" font-size="14">UC functions · SQL warehouse · Vector Search</text>
+            <text class="hud f-pink" x="1344" y="104" font-size="12">runs as YOU (OBO) · sql · vector-search</text>
+            <text class="sub" x="1344" y="128" font-size="12" style="fill:rgba(255,255,255,0.55)">the UC column mask follows your identity</text>
+
+            <!-- ===== MEMORY — LAKEBASE (cyan, app SP) ===== -->
+            <rect class="n-sh"  x="1188" y="198" width="540" height="150"/>
+            <rect class="n-box s-cyan" x="1180" y="190" width="540" height="150"/>
+            <path class="brk s-cyan" d="M1180,210 V190 H1200"/><path class="brk s-cyan" d="M1720,320 V340 H1700"/>
+            <!-- pixel DB cylinder -->
+            <g class="n-box s-cyan">
+                <rect x="1224" y="234" width="72" height="16"/><rect x="1224" y="254" width="72" height="16"/><rect x="1224" y="274" width="72" height="16"/>
+            </g>
+            <text class="ttl f-cyan" x="1344" y="234" font-size="19">MEMORY — LAKEBASE</text>
+            <text class="sub" x="1344" y="260" font-size="14">managed Postgres · schema memory_&lt;app&gt;</text>
+            <text class="hud f-cyan" x="1344" y="286" font-size="12">written as the app SP — it owns this schema</text>
+
+            <!-- ===== LLM — UNITY AI GATEWAY (yellow, app SP) ===== -->
+            <rect class="n-sh"  x="1188" y="380" width="540" height="150"/>
+            <rect class="n-box s-yellow" x="1180" y="372" width="540" height="150"/>
+            <path class="brk s-yellow" d="M1180,392 V372 H1200"/><path class="brk s-yellow" d="M1720,502 V522 H1700"/>
+            <!-- shield + chip glyph -->
+            <polygon class="n-box s-yellow" points="1236,412 1288,412 1288,448 1262,470 1236,448"/>
+            <rect class="f-yellow" x="1252" y="428" width="20" height="16"/>
+            <text class="ttl f-yellow" x="1344" y="416" font-size="19">LLM — UNITY AI GATEWAY</text>
+            <text class="sub" x="1344" y="442" font-size="14">Foundation Model API · pay-per-token · one line in app.yaml</text>
+            <text class="hud f-yellow" x="1344" y="468" font-size="12">as the app SP · payload logging · usage &amp; rate limits</text>
+
+            <!-- ===== legend — the two-identity decoder ===== -->
+            <rect class="f-pink" x="0" y="512" width="18" height="18"/>
+            <text class="lgd" x="26" y="527">as YOU (OBO): your grants + the PII column mask travel with the call</text>
+            <rect class="f-cyan"   x="880" y="512" width="18" height="18"/>
+            <rect class="f-yellow" x="902" y="512" width="18" height="18"/>
+            <text class="lgd" x="928" y="527">as the app's service principal: its own memory schema + the governed model call</text>
+        </svg>
         </div>
         <div class="reveal r4" style="display: flex; align-items: center; gap: 40px;">
             <div class="stat-block bracketed" style="min-width: 280px;">
