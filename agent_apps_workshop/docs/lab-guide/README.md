@@ -153,16 +153,24 @@ In the chat UI, replies **stream in live** — and each 🔧 tool call prints as
 
 ## Module 4 — Break it (~5 min)
 
-Probe the agent:
+Probe the agent — ask **both**, and compare:
 
-> *"Can I still order a brand-new Chevrolet Camaro?"* · *"How long is the bumper-to-bumper warranty on the Cadillac Escalade?"*
+> *"How long is the bumper-to-bumper warranty on the Cadillac Escalade?"* · *"Can I still order a brand-new Chevrolet Camaro?"*
 
 ![Chat: the planted bug surfaces](img/07-chat-planted-bug.png)
 
-The agent says **6-year warranty**; the official policy is **3 years / 36,000 miles**. The 🔧 chips
-tell you *why*: which tools did it call — and did it ever ask for the official policy? A real
-agent-quality bug (we planted three). Gut feel says it's broken; Module 5 **measures** it —
-and after you ship the fix, watch the chips change.
+Same trick is planted in **both** brochures — but you get **opposite** answers:
+
+- **Escalade warranty → wrong.** The agent says **6-year warranty**; the official policy is **3 years /
+  36,000 miles**. Warranty length isn't in the vehicle catalog, so the agent falls back to the
+  *marketing brochure* — and the brochure lies.
+- **Camaro availability → right.** The agent correctly says **discontinued**, even though the Camaro
+  brochure also brags it's "available to order today." Why the difference? Availability **is** in the
+  catalog, so the agent reads the trustworthy source and ignores the brochure.
+
+The 🔧 chips tell you *why*: which tools did it call for each question? **That contrast is the whole
+lesson** — an agent is only as good as *which source it trusts*. Gut feel says it's broken; Module 5
+**measures** it — and after you ship the fix, watch the warranty chips change.
 
 ---
 
@@ -178,13 +186,15 @@ and after you ship the fix, watch the chips change.
    | judge | baseline | fixed |
    |---|---|---|
    | **warranty_accuracy** | **0.6–0.8 ❌** | **1.0 ✅** |
-   | availability_accuracy | 1.0 | 1.0 |
+   | availability_accuracy | 1.0 | 1.0 *(the contrast case — green both sides)* |
    | policy_grounded | 1.0 | ~0.8\* |
 
    ![MLflow evaluation runs: baseline vs fixed](img/08-eval-baseline-vs-fixed.png)
 
    The "fix" is a **prompt change** — the warranty judge flips from failing to passing, with
-   per-row answers and judge rationales as **real traces**.
+   per-row answers and judge rationales as **real traces**. `availability_accuracy` stays green on
+   *both* sides — that's the Camaro contrast from Module 4: the catalog already protects the agent, so
+   there's nothing to fix. Not every risk is a live failure.
 
    > \* `policy_grounded` can stay dipped after the fix — that bug lives in the **data** (an
    > over-permissive loyalty service policy). Some agent bugs are prompt bugs; others are data bugs

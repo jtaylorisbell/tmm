@@ -52,12 +52,15 @@ observability via **MLflow 3 tracing & evaluation**.
 - **The agent is a prompt + tools + a model.** See `agent/app.py` → `build_agent()`. The shipped
   instructions are deliberately minimal ("v1") — Module 5 *measures* what that costs, and the fix
   is an edit to exactly that string.
-- **Three planted bugs** drive Modules 4–5: a discontinued model (Chevrolet Camaro) still marketed as
-  available to order, a marketing-copy warranty term (6 yr) that contradicts the official policy
-  (3 yr / 36,000 mi), and an over-permissive loyalty service policy. A good agent trusts the
-  authoritative catalog/policy over the marketing prose — and the evals measure exactly that. (The
-  warranty bug is the one that reliably flips ❌→✅ after the prompt fix; the repair-policy one is a
-  *data* bug no prompt fully fixes.)
+- **Planted marketing-vs-truth conflicts** drive Modules 4–5, and the *contrast* between them is the
+  lesson. The **same** lie is planted in two brochures: the Chevrolet Camaro is "available to order"
+  (it's discontinued) and the Cadillac Escalade has a "6-year warranty" (official policy is
+  3 yr / 36,000 mi). Only the **warranty** one becomes a failure — warranty length isn't in the vehicle
+  catalog, so the agent falls back to the lying brochure and reliably flips ❌→✅ after the prompt fix.
+  The **availability** one is the *control*: availability **is** in the catalog, so the agent already
+  answers it correctly (`availability_accuracy` is green on both runs). A third issue — an
+  over-permissive loyalty service policy — is a **data** bug no prompt fully fixes. A good agent trusts
+  the authoritative catalog/policy over marketing prose; the evals measure exactly which source it used.
 
 ---
 
@@ -103,7 +106,7 @@ agent_apps_workshop/
 
 ### 1. Provision the shared assets (once per workspace)
 Run **`agent_apps_setup/agent_apps_setup.py`** as a workspace admin. It creates the shared catalog
-`agent_apps_workshop.shared` (GM vehicle/service tables + the three planted bugs), the
+`agent_apps_workshop.shared` (GM vehicle/service tables + the planted quality issues), the
 `vehicle_docs_vs` Vector Search index, the three UC function tools, a shared SQL warehouse, the
 Lakebase memory project, the governance (PII column mask + grants), the **Unity AI Gateway** config
 on the LLM endpoint, and deploys the shared **lab-guide app**.

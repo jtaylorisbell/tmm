@@ -91,9 +91,12 @@ print(ask(make_agent(_baseline_instructions), "How long is the bumper-to-bumper 
 
 # MAGIC %md
 # MAGIC ## 3. The evaluation dataset
-# MAGIC Five realistic service questions. Three target the **planted bugs** (warranty, availability,
-# MAGIC over-permissive repair policy); one is a recall control and one an order lookup. Each row's
-# MAGIC `inputs` becomes the argument to our predict function.
+# MAGIC Five realistic service questions. **Warranty** (Escalade) and **repair coverage** (loyalty
+# MAGIC policy) are the two real failures — the first is prompt-fixable, the second is a data bug that
+# MAGIC persists. **Availability** (Camaro) is the *contrast/control*: the same marketing lie is planted
+# MAGIC in the brochure, but availability lives in the structured catalog so the agent already answers it
+# MAGIC right — expect `availability_accuracy` green on both runs. The recall and order-lookup rows are
+# MAGIC additional controls. Each row's `inputs` becomes the argument to our predict function.
 
 # COMMAND ----------
 

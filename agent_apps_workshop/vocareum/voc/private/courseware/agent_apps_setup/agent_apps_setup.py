@@ -248,12 +248,20 @@ else:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 4 — Inject the 3 workshop quality bugs
-# MAGIC 1. Discontinued vehicles described as "available to order" in `vehicle_docs`
-# MAGIC 2. Cadillac brochures claim a 6-year/72,000-mile warranty (the catalog `basic_warranty_years`
-# MAGIC    AND the official policy both say 3-year/36,000-mile — ONLY the marketing doc lies, so the
-# MAGIC    "ground in authoritative sources" lesson is unambiguous even to sharp-eyed attendees)
-# MAGIC 3. An over-permissive "extended" loyalty service policy row
+# MAGIC ## Step 4 — Inject the workshop quality bugs
+# MAGIC We plant the SAME marketing-vs-truth lie in two brochures; only one becomes an agent failure —
+# MAGIC that contrast is the core lesson (see the presenter guide "Break it" / cheat-sheet).
+# MAGIC 1. **Availability (the contrast/control):** discontinued vehicles (Camaro, Malibu) described as
+# MAGIC    "available to order" in the `vehicle_docs` brochure. This lie exists, but the agent does NOT
+# MAGIC    fall for it: availability is a field on `get_vehicle_details`, so the agent reads the truthful
+# MAGIC    catalog. `availability_accuracy` passes at baseline — it's the deliberate counter-example to #2,
+# MAGIC    NOT a bug that gets fixed. (Keep the injection: it makes the "same lie, opposite outcome" real.)
+# MAGIC 2. **Warranty (the flip; prompt-fixable):** Cadillac brochures claim a 6-year/72,000-mile warranty
+# MAGIC    (the catalog `basic_warranty_years` AND the official policy both say 3-year/36,000-mile — ONLY
+# MAGIC    the marketing doc lies). Warranty length is NOT on `get_vehicle_details`, so the agent falls
+# MAGIC    back to the lying brochure — the failure #1's fact avoids because the catalog covers it.
+# MAGIC 3. **Repair coverage (the data bug):** an over-permissive "extended" loyalty service policy row —
+# MAGIC    a wrong answer grounded in a real retrieved policy; no prompt fully fixes it.
 
 # COMMAND ----------
 

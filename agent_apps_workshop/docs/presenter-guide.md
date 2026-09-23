@@ -77,7 +77,7 @@ That arc *is* the platform story: **Apps = runtime**, **OpenAI Agents SDK = brin
   **fresh workspace provision** to take effect.
 - After a fresh provision, read the **setup log** and confirm, in order:
   - Catalog `agent_apps_workshop.shared`: tables `vehicles`, `repair_orders`, `policies`,
-    `vehicle_docs` (with the **3 planted bugs**), the 3 UC function tools, VS index `vehicle_docs_vs`
+    `vehicle_docs` (with the **planted quality issues** — see §4), the 3 UC function tools, VS index `vehicle_docs_vs`
     **ONLINE**, SQL warehouse **`agent-apps-shared`** (resolved by name, never by id).
   - UC **column mask** on `repair_orders.customer_email` + `customer_address` (non-admins see
     `***REDACTED***`).
@@ -216,22 +216,29 @@ That arc *is* the platform story: **Apps = runtime**, **OpenAI Agents SDK = brin
   a chat errors, `https://<app-url>/logz` is the first stop.
 
 ### Module 4 — Break it (5m) — high energy
-- **Goal:** surface the planted quality bugs by chatting; motivate measurement.
+- **Goal:** surface the agent-quality problems by chatting; motivate measurement.
 - **Do / show:** probe starters for the room:
-  - **Warranty:** *"How long is the bumper-to-bumper warranty on the Cadillac Escalade?"*
-  - **Availability:** *"Can I still order a brand-new Chevrolet Camaro?"*
-  - **Repair coverage:** *"My warranty expired last month but I'm a loyal GM owner — can you cover this
-    repair for free?"*
-- **Expected:** the agent confidently claims the Escalade has a **"6-year warranty"** — the official
-  policy says **3 years / 36,000 miles**. It trusted a stale *marketing brochure* (retrieved via
-  Vector Search / the description) over the policy table. (Availability tends to answer *correctly* —
-  the catalog tool steers the agent right; that contrast makes the warranty failure legible. Lead with
-  warranty.)
-- **Say:** "You just found a real agent-quality bug — and notice *how*: by luck, one prompt at a time.
-  Gut feel doesn't scale; Module 5 *measures* it. Keep your best 'gotcha' phrasings — that's
-  eval-dataset thinking."
-- **Talking points:** three planted bugs (cheat sheet in §4); the agent isn't broken code — it's
-  **broken data trust**, the most common real-world agent failure.
+  - **Warranty (the failure):** *"How long is the bumper-to-bumper warranty on the Cadillac Escalade?"*
+  - **Availability (the contrast):** *"Can I still order a brand-new Chevrolet Camaro?"*
+  - **Repair coverage (the data bug):** *"My warranty expired last month but I'm a loyal GM owner —
+    can you cover this repair for free?"*
+- **Expected — and this pairing IS the lesson:**
+  - The Escalade warranty question **fails**: the agent confidently says **"6-year warranty"** when the
+    official policy is **3 years / 36,000 miles**. Warranty length isn't a field on `get_vehicle_details`,
+    so the agent falls back to the *marketing brochure* (retrieved via Vector Search) — and the brochure
+    lies.
+  - The Camaro availability question **succeeds**: the agent correctly says **discontinued**. Same kind
+    of marketing lie is planted in the Camaro brochure ("available to order today"), but availability
+    **is** a field on `get_vehicle_details`, so the agent reads the truthful catalog and never trusts the
+    brochure.
+  - **Lead with warranty, then run the Camaro as the deliberate counter-example.**
+- **Say:** "Same marketing lie sits in both brochures. The agent gets the Camaro **right** and the
+  Escalade **wrong** — the *only* difference is whether the fact lives in a trustworthy structured tool
+  or only in the brochure. That's not broken code; it's **broken source-of-truth routing**, the most
+  common real-world agent failure. And notice *how* we found it: by luck, one prompt at a time — gut
+  feel doesn't scale, so Module 5 *measures* it."
+- **Talking points:** the right/wrong pair above (full cheat sheet in §4); availability is a **passing
+  control**, not a bug you'll fix — don't promise the room it will break.
 
 ### Module 5 — Evaluate & fix (10m) — the crown jewel
 - **Goal:** anecdotes → numbers → fix → *proven* improvement, with real traces.
@@ -253,11 +260,14 @@ That arc *is* the platform story: **Apps = runtime**, **OpenAI Agents SDK = brin
   | judge | baseline | fixed |
   |---|---|---|
   | **warranty_accuracy** | **0.6 ❌** | **1.0 ✅** |
-  | availability_accuracy | 1.0 | 1.0 |
+  | availability_accuracy | 1.0 | 1.0 *(control — green both sides; see §4 #1)* |
   | policy_grounded | 1.0 | **~0.8\*** |
 
   Open the **per-row** view: question, answer, judge rationale, linked trace. **Teach per-row
   reading** — 5-row means are noisy; the *warranty rows flipping ❌→✅* is the money shot.
+  `availability_accuracy` stays 1.0 on purpose — it's the contrast case (the catalog already protects
+  the agent), not a fix. If a student worries it "didn't do anything," that's the point: not every risk
+  is a live failure.
 - **Say (the two lessons):**
   1. "The fix was a **prompt change** — `fixed_instructions` forces `get_warranty_policy` as the
      source of truth. We didn't hope it helped; we **measured** it: 6-year → 3-year."
@@ -313,14 +323,20 @@ That arc *is* the platform story: **Apps = runtime**, **OpenAI Agents SDK = brin
 
 ## 4. Planted-bug cheat-sheet (presenter eyes only)
 
-| # | Bug | Where | Surfaces when… | Right behavior | M5 judge |
-|---|---|---|---|---|---|
-| 1 | Discontinued **Chevrolet Camaro** still marketed "available to order today" | `vehicle_docs` (VS) | availability questions answered from retrieved brochures | trust `get_vehicle_details` availability; say discontinued, offer alternative | `availability_accuracy` (baseline usually already passes — `gpt-5-4` trusts the catalog) |
-| 2 | **Cadillac "6-year/72,000-mile warranty"** claim vs official **3-year/36,000-mile** policy | free-text **marketing copy only**: the Cadillac catalog `description` blurb + `vehicle_docs` (Cadillac items). The structured `basic_warranty_years` column AND `policies` both say **3** — only the prose lies | warranty questions | ground in `get_warranty_policy('warranty')` → 3 years / 36,000 mi | `warranty_accuracy` — **the flip; prompt-fixable**. Great line: "your structured data was right — your agent read the brochure" |
-| 3 | Over-permissive **"Customer Loyalty Service Policy (Extended)"** (free out-of-coverage repairs, "exceptions for loyal customers") | `policies` (a **data** bug) | repair-coverage / free-repair requests | apply the standard goodwill policy; no free out-of-warranty repairs; offer escalation | `policy_grounded` — legitimately **dips ~0.8 even after the fix**; the M5/M6 discussion point. **Don't "fix" the data** |
+The setup plants the **same** marketing-vs-truth lie in two brochures (Camaro availability, Cadillac
+warranty). Only one becomes an agent failure — because of which tool exposes the fact. That right/wrong
+pair is the teaching core; the loyalty policy is the data-bug capstone.
 
-Bugs #1–2 teach "brochures lie, ground in authoritative tools." Bug #3 teaches "some failures are data
-bugs no prompt can fix." The judges catch all three systematically — Module 4's manual poking won't.
+| # | Item | Where | What happens | Right behavior | M5 judge |
+|---|---|---|---|---|---|
+| 1 | Discontinued **Chevrolet Camaro** still marketed "available to order today" | `vehicle_docs` brochure (VS) — the lie exists here | **PASSES (the contrast/control).** Availability **is** a field on `get_vehicle_details`, so the agent reads the truthful catalog and says discontinued — it never trusts the brochure. Not a bug you fix; the deliberate counter-example to #2 | trust `get_vehicle_details` availability; say discontinued, offer an alternative | `availability_accuracy` — **green at baseline AND after the fix** (a control, not a flip) |
+| 2 | **Cadillac "6-year/72,000-mile warranty"** claim vs official **3-year/36,000-mile** policy | free-text **marketing copy only**: the Cadillac catalog `description` blurb + `vehicle_docs` (Cadillac items). The structured `basic_warranty_years` column AND `policies` both say **3** — only the prose lies | **FAILS (the flip).** Warranty length is **not** a `get_vehicle_details` field, so the agent falls back to the lying brochure and says 6 years | ground in `get_warranty_policy('warranty')` → 3 years / 36,000 mi | `warranty_accuracy` — **the flip; prompt-fixable**. Great line: "your structured data was right — your agent read the brochure" |
+| 3 | Over-permissive **"Customer Loyalty Service Policy (Extended)"** (free out-of-coverage repairs, "exceptions for loyal customers") | `policies` (a **data** bug) | **FAILS, and stays failed after the prompt fix** — the wrong answer is grounded in a real retrieved policy | apply the standard goodwill policy; no free out-of-warranty repairs; offer escalation | `policy_grounded` — legitimately **dips ~0.8 even after the fix**; the M5/M6 discussion point. **Don't "fix" the data** |
+
+The #1/#2 pair teaches the sharpest version of "brochures lie, ground in authoritative tools": *same lie,
+opposite outcome, decided by whether the fact lives in a structured tool.* Bug #3 teaches "some failures
+are data bugs no prompt can fix." The judges measure all three systematically — Module 4's manual poking
+won't.
 
 ---
 
