@@ -209,7 +209,7 @@ elif status == 404:
         "/api/2.0/apps",
         {
             "name": APP_NAME,
-            "description": "TechMart customer-support agent (DAIS 2026 lab)",
+            "description": "GM dealer service assistant (GM agent apps lab)",
             "resources": [POSTGRES_RESOURCE],
         },
     )
@@ -486,8 +486,8 @@ displayHTML(
 # MAGIC 1. **Open your app URL** (above) → **Authorize** on the consent screen → say hello.
 # MAGIC 2. Check the chat header shows **memory: session** (your agent remembers the conversation —
 # MAGIC    you'll go look at the actual rows in Lakebase in Module 5½).
-# MAGIC 3. Continue with **Module 3** in the lab guide (the OBO governance story — try order
-# MAGIC    `ORD-10001` and watch the PII come back redacted).
+# MAGIC 3. Continue with **Module 3** in the lab guide (the OBO governance story — try repair order
+# MAGIC    `RO-10001` and watch the PII come back redacted).
 # MAGIC
 # MAGIC > Something off? Re-running this whole notebook is always safe — it reuses the app, repairs
 # MAGIC > the role, re-deploys, and restarts only when needed.

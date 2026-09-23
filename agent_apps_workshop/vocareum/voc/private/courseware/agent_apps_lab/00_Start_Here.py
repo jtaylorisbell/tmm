@@ -1,11 +1,12 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # 🛠️ Build a Custom AI Agent on Databricks Apps — *Start Here*
-# MAGIC ### From Prompt to Production · Data + AI Summit 2026 · ~90 min
+# MAGIC ### From Prompt to Production · Built for General Motors · ~45 min
 # MAGIC
-# MAGIC You're a data engineer at **TechMart** (a fictional electronics retailer) standing up an AI
-# MAGIC customer-support agent: **build** it on Databricks Apps, **govern** it, deliberately **break**
-# MAGIC it, **measure** the breakage with LLM judges, **fix** it, and **prove** the fix.
+# MAGIC You're a data engineer at **General Motors** standing up an AI **dealer service assistant** —
+# MAGIC vehicles, repair orders, warranty/recall policies: **build** it on Databricks Apps, **govern**
+# MAGIC it, deliberately **break** it, **measure** the breakage with LLM judges, **fix** it, and
+# MAGIC **prove** the fix.
 # MAGIC
 # MAGIC > **This is a coding-agent-driven lab.** You *direct* **Genie Code** and it writes/deploys for
 # MAGIC > you. Every module has a click-through fallback so a hiccup never blocks you.
@@ -27,10 +28,10 @@
 # MAGIC %md
 # MAGIC ## ⭐ Module 0 — Meet Genie Code & give it the lab context (2 min)
 # MAGIC Genie Code is your in-workspace coding agent. Its built-in **skills** give it the platform
-# MAGIC mechanics — they know nothing about *our* TechMart lab. **Do this now:**
+# MAGIC mechanics — they know nothing about *our* GM lab. **Do this now:**
 # MAGIC 1. **Open Genie Code** — the panel in this notebook, or the icon in the top bar.
-# MAGIC 2. **See what it knows:** ask *"What skills do you have available?"* (No TechMart skill — step 3
-# MAGIC    fixes that.)
+# MAGIC 2. **See what it knows:** ask *"What skills do you have available?"* (No GM-specific skill —
+# MAGIC    step 3 fixes that.)
 # MAGIC 3. **Hand it the lab context:** type **`@LAB_CONTEXT.md`** in your prompt (or **Add context →
 # MAGIC    Attach files**).
 # MAGIC
@@ -68,27 +69,31 @@ SCHEMA = "shared"
 # PREFIX and differ in the trailing digits — the tail is what makes each name unique.
 APP_NAME = ("agent-apps-" + username[-19:].lstrip("-")).rstrip("-")
 # The shared lab-guide app (deployed by workshop setup; one per workspace, all students CAN_USE).
-# App URLs are <app-name>-<workspace-id>.<cloud-domain>; derive ours from the workspace id so the
-# link works in every lab workspace without hardcoding.
+# Read the app's REAL url from the Apps API rather than constructing the host by hand: Apps URLs
+# vary by cloud AND region — e.g. <app>-<ws-id>.aws.databricksapps.com on AWS vs
+# <app>-<ws-id>.<NN>.azure.databricksapps.com on Azure — so a hand-built host only works on AWS.
+# CAN_USE is enough to GET the app; if the lookup fails we fall back to UI navigation below.
+GUIDE_APP_NAME = "agent-lab-guide"
 def _guide_url() -> str:
     try:
-        ws_id = dbutils.notebook.entry_point.getDbutils().notebook().getContext().workspaceId().get()
-        return f"https://agent-lab-guide-{ws_id}.aws.databricksapps.com"
+        from databricks.sdk import WorkspaceClient
+        info = WorkspaceClient().api_client.do("GET", f"/api/2.0/apps/{GUIDE_APP_NAME}")
+        return (info or {}).get("url") or ""
     except Exception:
         return ""  # fall back to UI navigation below
 
 GUIDE_URL = _guide_url()
 
 print(f"Signed in as:         {email}")
-print(f"Shared TechMart data: {CATALOG}.{SCHEMA}   (products, orders, policies, product_docs + product_docs_vs)")
-print(f"Agent tools (UC fns): {CATALOG}.{SCHEMA}.{{get_product_details, get_order_status, get_return_policy}}")
+print(f"Shared GM data:       {CATALOG}.{SCHEMA}   (vehicles, repair_orders, policies, vehicle_docs + vehicle_docs_vs)")
+print(f"Agent tools (UC fns): {CATALOG}.{SCHEMA}.{{get_vehicle_details, get_service_status, get_warranty_policy}}")
 print(f"SQL warehouse:        agent-apps-shared   (your agent runs the tools on-behalf-of-you)")
 print(f"Your app name:        {APP_NAME}   (you deploy your own app; <=30 chars)")
 print(f"Your memory schema:   memory_{APP_NAME.replace('-', '_')}   (your agent's Lakebase conversation history lives here)")
 print(f"Lab guide app:        {GUIDE_URL or 'Compute -> Apps -> agent-lab-guide'}   (guide at /, slide deck at /deck)")
 print()
 print("👉 Next: open 01_Explore_Data (Module 1). When you're ready for Module 2, open Genie Code,")
-print("   attach LAB_CONTEXT.md (Add context / @LAB_CONTEXT.md), and say: \"I'm in the TechMart agent lab — help me start Module 2.\"")
+print("   attach LAB_CONTEXT.md (Add context / @LAB_CONTEXT.md), and say: \"I'm in the GM service agent lab — help me start Module 2.\"")
 
 if GUIDE_URL:
     displayHTML(
@@ -105,13 +110,13 @@ if GUIDE_URL:
 # MAGIC ## The modules (full illustrated instructions in the lab-guide app — link above ↑)
 # MAGIC | # | Module | You'll… |
 # MAGIC |---|---|---|
-# MAGIC | 1 | **Explore the data** | Browse `agent_apps_workshop.shared` — notice some odd product docs. Open `01_Explore_Data`. |
+# MAGIC | 1 | **Explore the data** | Browse `agent_apps_workshop.shared` — notice some odd vehicle brochures. Open `01_Explore_Data`. |
 # MAGIC | 2 | **Build & deploy the agent** | Direct Genie Code to deploy the `agent/` starter as your own **Databricks App** — its tools run **on-behalf-of-you (OBO)**. (Fallback: **`02_Deploy_App`** → Run All.) |
-# MAGIC | 3 | **Govern with OBO** | Because your agent runs **on-behalf-of-you**, the UC **column mask** auto-redacts customer PII in the order lookup for non-admins — see it live in your agent. |
+# MAGIC | 3 | **Govern with OBO** | Because your agent runs **on-behalf-of-you**, the UC **column mask** auto-redacts customer PII in the repair-order lookup for non-admins — see it live. Plus **Unity AI Gateway** governs the model call. |
 # MAGIC | 4 | **Break it** | Chat with your agent and surface the planted quality bugs. |
-# MAGIC | 5 | **Evaluate & fix** | Open **`05_Evaluate_and_Fix`** (ready to run) — **MLflow LLM judges** → baseline → fix the prompt → re-eval → **prove** the gain. |
+# MAGIC | 5 | **Evaluate & fix** | Open **`05_Evaluate_and_Fix`** (ready to run) — **6 MLflow LLM judges** → baseline → fix the prompt → re-eval → **prove** the gain → then a **5-model axis** (evaluate before you swap). |
 # MAGIC | 5½ | **Visit your agent's memory** | **Compute → Lakebase → Open Lakebase** → project "Agent Apps Workshop Memory" → SQL Editor → query `agent_messages` in **your app's schema** (printed above) — every chat is there. |
-# MAGIC | 6 | **Productionize** | Recap the **DABs** deploy + CI/CD; traces in UC; debug with Genie. |
+# MAGIC | 6 | **Productionize** | Recap the **DABs** deploy + CI/CD; traces in UC; **AI Gateway** guardrails + spend caps; debug with Genie. |
 
 # COMMAND ----------
 

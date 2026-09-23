@@ -1,10 +1,11 @@
 # 🛠️ Build a Custom AI Agent on Databricks Apps — From Prompt to Production
 
-A **~90-minute, coding-agent-driven** hands-on workshop (built for **Data + AI Summit 2026**).
-Participants build a custom AI customer-support agent for **TechMart** (a fictional electronics
-retailer), deploy it live on **Databricks Apps**, govern it, deliberately **break** it on planted
-data bugs, **measure** the breakage with LLM judges, **fix** it, and **prove** the fix with numbers —
-the full agent-hardening loop, in one sitting.
+A **~45-minute, coding-agent-driven** hands-on workshop, **adapted for General Motors**.
+Participants build a custom AI **dealer service assistant** for **GM** (vehicles across Chevrolet,
+GMC, Buick, and Cadillac; service repair orders; warranty & recall policies), deploy it live on
+**Databricks Apps**, govern it, deliberately **break** it on planted data bugs, **measure** the
+breakage with LLM judges, **fix** it, and **prove** the fix with numbers — the full agent-hardening
+loop, in one sitting.
 
 > **Coding-agent-driven:** participants direct **Genie Code** (the in-workspace coding agent) in
 > plain English; it writes and deploys for them. Every step also has a click-through fallback, so a
@@ -13,8 +14,9 @@ the full agent-hardening loop, in one sitting.
 **The platform story:** custom agents on **Databricks Apps** · **OpenAI Agents SDK** harness ·
 tools via **UC Functions + Vector Search, all running on-behalf-of-user (OBO)** · conversation
 memory in **Lakebase** (managed Postgres) · LLM via **Foundation Model APIs** (`databricks-gpt-5`,
-swappable in `app.yaml`) · governance via **OBO + UC column masks** · observability via **MLflow 3
-tracing & evaluation**.
+swappable in `app.yaml`) governed by **Unity AI Gateway** · governance via **OBO + UC column masks**
+(data path) and **Unity AI Gateway** inference-table logging + usage/rate limits (model path) ·
+observability via **MLflow 3 tracing & evaluation**.
 
 ---
 
@@ -23,13 +25,13 @@ tracing & evaluation**.
 | # | Module | The beat |
 |---|--------|----------|
 | 0 | **Meet Genie Code** | Attach `LAB_CONTEXT.md`; the in-workspace coding agent becomes your pair |
-| 1 | **Explore the data** | A live UC **column mask** redacts order PII *for you specifically*; the marketing docs look… off |
+| 1 | **Explore the data** | A live UC **column mask** redacts repair-order PII *for you specifically*; the vehicle brochures look… off |
 | 2 | **Build & deploy** | One plain-English prompt → Genie deploys your own app (`sql` + `vector-search` scopes + a `postgres` memory resource, **zero SP grants on the data**) |
-| 3 | **Govern with OBO** | The same column mask follows your identity *through the deployed app* — governance you didn't build |
-| 4 | **Break it** | Chat with the agent and surface the planted quality bugs (the warranty answer is the star) |
-| 5 | **Evaluate & fix** | MLflow **LLM judges** → baseline fails → fix the prompt → re-run → the score flips, with real traces |
+| 3 | **Govern with OBO** | The same column mask follows your identity *through the deployed app* — plus **Unity AI Gateway** governs the model call. Governance you didn't build |
+| 4 | **Break it** | Chat with the agent and surface the planted quality bugs (the Escalade warranty answer is the star) |
+| 5 | **Evaluate & fix** | 8-question eval, **6 MLflow LLM judges** → baseline fails → fix the prompt → score flips → then a **5-model axis** ("evaluate before you swap") |
 | 5½ | **Visit the memory** | Query your own chat transcript out of Lakebase (Postgres) — and the app's **≡ Journal** reads the same tables |
-| 6 | **Productionize** | Recap: package as a Databricks Asset Bundle, traces in UC, judges as CI regression gates |
+| 6 | **Productionize** | Recap: package as a Databricks Asset Bundle, traces in UC, judges as CI regression gates, AI Gateway guardrails + spend caps |
 
 ---
 
@@ -39,17 +41,28 @@ tracing & evaluation**.
   user* via the app's forwarded token — so the app's service principal needs **no grants** on the
   shared data, and Unity Catalog governance (the PII column mask) follows the user automatically.
   The LLM runs as the app SP on Foundation Model APIs (pay-per-token, no grant).
+- **The model path is governed too — by Unity AI Gateway.** The agent's serving endpoint is
+  configured with inference-table payload logging, usage tracking, and a rate limit — all in Unity
+  Catalog. So *both* paths are governed: data via OBO + UC masks, model via Unity AI Gateway.
+  (Gateway *guardrails* — PII/safety — are intentionally left off: they gate the chat and break a
+  streaming agent, so they're a Module 6 topic. See setup Step 11.)
 - **Conversation memory in Lakebase.** The app is created with a `postgres` resource; transcripts
   are written **as the app's own SP** into a per-app schema it owns. Memory is optional — if
   Lakebase is unreachable the chat degrades gracefully to single-turn.
 - **The agent is a prompt + tools + a model.** See `agent/app.py` → `build_agent()`. The shipped
   instructions are deliberately minimal ("v1") — Module 5 *measures* what that costs, and the fix
   is an edit to exactly that string.
-- **Three planted bugs** drive Modules 4–5: a discontinued product still marketed as available, a
-  marketing-copy warranty term (3 yr) that contradicts the official policy (1 yr), and an
-  over-permissive returns policy. A good agent trusts the authoritative catalog/policy over the
-  marketing prose — and the evals measure exactly that. (The warranty bug is the one that reliably
-  flips ❌→✅ after the prompt fix; the returns one is a *data* bug no prompt fully fixes.)
+- **Planted marketing-vs-truth conflicts** drive Modules 4–5, and the *contrast* between them is the
+  lesson. The **same** lie is planted in two brochures: the Chevrolet Camaro is "available to order"
+  (it's discontinued) and the Cadillac Escalade has a "6-year warranty" (official policy is
+  3 yr / 36,000 mi). Only the **warranty** one becomes a failure — warranty length isn't in the vehicle
+  catalog, so the agent falls back to the lying brochure and reliably flips ❌→✅ after the prompt fix.
+  The **availability** one is the *control*: availability **is** in the catalog, so the agent already
+  answers it correctly (`availability_accuracy` is green on both runs). Module 5 adds more risks —
+  **PII disclosure** under pressure (the fix flips it), **fabrication** for a car not in the catalog,
+  and an **over-permissive loyalty policy** the models largely *resist* (the cheap model on the model
+  axis is the wobbly one — capability buys reliability). A good agent trusts the authoritative
+  catalog/policy over marketing prose; the evals measure exactly which source it used, across models.
 
 ---
 
@@ -87,14 +100,18 @@ agent_apps_workshop/
 - **Databricks Apps** with **User Authorization (OBO)** enabled
 - **Vector Search**, **Lakebase** (managed Postgres), and **Foundation Model APIs** (a `gpt-5`-class
   endpoint; swappable via `LLM_ENDPOINT` in `agent/app.yaml`)
+- **Unity AI Gateway** (to govern the LLM serving endpoint — inference-table payload logging, usage
+  tracking, rate limit; guardrails left off — they gate/stream-break this app, a Module 6 topic;
+  setup configures it best-effort and the lab still runs if it's unavailable)
 - **Genie Code** (the in-workspace coding agent) for the driven path — the click-through notebooks
   work without it
 
 ### 1. Provision the shared assets (once per workspace)
 Run **`agent_apps_setup/agent_apps_setup.py`** as a workspace admin. It creates the shared catalog
-`agent_apps_workshop.shared` (TechMart tables + the three planted bugs), the `product_docs_vs`
-Vector Search index, the three UC function tools, a shared SQL warehouse, the Lakebase memory
-project, the governance (PII column mask + grants), and deploys the shared **lab-guide app**.
+`agent_apps_workshop.shared` (GM vehicle/service tables + the planted quality issues), the
+`vehicle_docs_vs` Vector Search index, the three UC function tools, a shared SQL warehouse, the
+Lakebase memory project, the governance (PII column mask + grants), the **Unity AI Gateway** config
+on the LLM endpoint, and deploys the shared **lab-guide app**.
 
 ### 2. Give each participant the lab content
 Copy `agent_apps_lab/` into each participant's workspace home. They start at **`00_Start_Here`**.
