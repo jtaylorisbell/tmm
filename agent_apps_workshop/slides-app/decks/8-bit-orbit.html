@@ -553,7 +553,7 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
                  Pink = "as the signed-in user (OBO)"; cyan/yellow = "as the app's service
                  principal". Everything snaps to the 4px unit; colors are theme tokens. === -->
         <div class="reveal r3" style="margin-bottom: 28px;">
-        <svg viewBox="0 0 1728 548" style="width:100%; height:auto; display:block; overflow:visible;" role="img"
+        <svg viewBox="0 0 1728 566" style="width:100%; height:auto; display:block; overflow:visible;" role="img"
              aria-label="Architecture: the user's token flows to the Databricks App, which calls data tools as you (OBO) and memory plus the LLM as its own service principal.">
             <style>
                 .n-box{ fill:rgba(15,27,61,0.65); stroke-width:2; }
@@ -650,12 +650,12 @@ a.hero-badge:hover { background: rgba(244, 208, 63, 0.15); transform: translate(
             <text class="sub" x="1344" y="442" font-size="14">Foundation Model API · pay-per-token · one line in app.yaml</text>
             <text class="hud f-yellow" x="1344" y="468" font-size="12">as the app SP · payload logging · usage &amp; rate limits</text>
 
-            <!-- ===== legend — the two-identity decoder ===== -->
-            <rect class="f-pink" x="0" y="512" width="18" height="18"/>
-            <text class="lgd" x="26" y="527">as YOU (OBO): your grants + the PII column mask travel with the call</text>
-            <rect class="f-cyan"   x="880" y="512" width="18" height="18"/>
-            <rect class="f-yellow" x="902" y="512" width="18" height="18"/>
-            <text class="lgd" x="928" y="527">as the app's service principal: its own memory schema + the governed model call</text>
+            <!-- ===== legend — the two-identity decoder (kept clear of the LLM node's lower edge) ===== -->
+            <rect class="f-pink" x="0" y="536" width="18" height="18"/>
+            <text class="lgd" x="26" y="550">as YOU (OBO): your grants + the PII column mask travel with the call</text>
+            <rect class="f-cyan"   x="880" y="536" width="18" height="18"/>
+            <rect class="f-yellow" x="902" y="536" width="18" height="18"/>
+            <text class="lgd" x="928" y="550">as the app's service principal: its own memory schema + the governed model call</text>
         </svg>
         </div>
         <div class="reveal r4" style="display: flex; align-items: center; gap: 40px;">
