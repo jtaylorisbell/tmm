@@ -22,9 +22,9 @@
 
 # MAGIC %sql
 # MAGIC -- SERVICE REPAIR ORDERS — note what you can and CAN'T see. Customer PII (email, address)
-# MAGIC -- is governed by a Unity Catalog column mask: as a (non-admin) lab user you see ***REDACTED***.
-# MAGIC -- Remember this view — in Module 3 the SAME mask fires through your deployed agent, because
-# MAGIC -- the agent's data tools run on-behalf-of-YOU.
+# MAGIC -- is governed by a Unity Catalog ABAC column-mask policy evaluated against YOUR identity, so
+# MAGIC -- you see ***REDACTED***. Remember this view — in Module 3 the SAME policy fires through your
+# MAGIC -- deployed agent, because the agent's data tools run on-behalf-of-YOU.
 # MAGIC SELECT * FROM agent_apps_workshop.shared.repair_orders LIMIT 20;
 
 # COMMAND ----------

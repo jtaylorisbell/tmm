@@ -25,7 +25,9 @@
 # MAGIC 5. Vector Search endpoint + `vehicle_docs_vs` delta-sync index
 # MAGIC 6. The 3 **UC function tools** (`get_vehicle_details`, `get_service_status`, `get_warranty_policy`)
 # MAGIC 7. Grants to `account users` (USE CATALOG / USE SCHEMA / SELECT / EXECUTE)
-# MAGIC 8. Governance: UC column mask on `repair_orders` PII (unmasked only for the admin group)
+# MAGIC 8. Governance: ABAC column-mask **policy** on `repair_orders` PII — matches columns by system
+# MAGIC     `class.*` governed tags; masks an explicit set of principals (incl. whoever runs setup, so
+# MAGIC     the presenter can rehearse the student view). Identities not in the list see raw values
 # MAGIC 9. A shared **PRO serverless SQL warehouse** granted to all users (for the agent's OBO lookup)
 # MAGIC 10. A shared autoscaling **Lakebase** project (`agent-apps-memory`), `users` CAN MANAGE on it
 # MAGIC     (so each student's app attaches it as a `postgres` resource — SP memory, per-app schema),
@@ -34,7 +36,7 @@
 # MAGIC     `agent_apps_workshop.shared` with an **inference table** (payload logging in our own schema);
 # MAGIC     the app calls it by UC name via the gateway's OpenAI route. Guardrails left off — they
 # MAGIC     gate/stream-break this app (a Module 6 topic). Model-path governance complementing the OBO +
-# MAGIC     UC column mask on the data path
+# MAGIC     ABAC column-mask policy on the data path
 # MAGIC 12. **AI Dev Kit skills** distributed to `/Workspace/.assistant/skills/` so every student's
 # MAGIC     **Genie Code** can scaffold + deploy the agent App (Module 2) and evaluate it (Module 5)
 # MAGIC 13. A shared **lab-guide app** (`agent-lab-guide`) — the participant guide + field-guide deck,
@@ -63,14 +65,17 @@ dbutils.widgets.text("token", "", "Admin token (injected)")
 dbutils.widgets.text("workshop_catalog", "agent_apps_workshop", "Workshop catalog")
 dbutils.widgets.text("workshop_schema", "shared", "Shared schema")
 dbutils.widgets.text("vs_endpoint", "agent-apps-vs", "Vector Search endpoint")
-dbutils.widgets.text("admin_group", "admins", "Admin group (unmasked PII)")
+dbutils.widgets.text("masked_principals", "", "Extra PII-masked principals (comma-separated; whoever runs setup is auto-included)")
 
 HOST = dbutils.widgets.get("host").strip()
 TOKEN = dbutils.widgets.get("token").strip()
 CATALOG = dbutils.widgets.get("workshop_catalog").strip()
 SCHEMA = dbutils.widgets.get("workshop_schema").strip()
 VS_ENDPOINT = dbutils.widgets.get("vs_endpoint").strip()
-ADMIN_GROUP = dbutils.widgets.get("admin_group").strip()
+# ABAC: the PII mask fires for an EXPLICIT list of principals (not a group). Whoever runs setup is
+# auto-included in Step 8, so the presenter sees exactly the redacted view a student would; any
+# identity NOT listed sees the raw values. Add named attendees via the widget for a class delivery.
+MASKED_PRINCIPALS = [p.strip() for p in dbutils.widgets.get("masked_principals").split(",") if p.strip()]
 
 # Workspace-local group for resource-level permission APIs (warehouses, workspace ACLs). Use the
 # built-in workspace `users` group — NOT `account users`: the account group resolves for UC SQL
@@ -79,8 +84,13 @@ ADMIN_GROUP = dbutils.widgets.get("admin_group").strip()
 # (The framework's own warehouse/VS grants use `users` too.)
 ALL_USERS_GROUP = "users"
 
-# Columns in `repair_orders` that contain customer PII and get masked for non-admins
-PII_COLUMNS = ["customer_email", "customer_address"]
+# Columns in `repair_orders` that contain customer PII, mapped to the Databricks **system**
+# (predefined, `class.*`) governed tag that classifies each. ABAC matches columns by these tags, so
+# no custom governed-tag creation (an account-admin privilege) is needed — we only assign them.
+PII_COLUMN_TAGS = {
+    "customer_email": "class.email_address",  # predefined system classification tag
+    "customer_address": "class.location",     # nearest system tag for a physical/geographic address
+}
 
 from databricks.sdk import WorkspaceClient
 
@@ -92,7 +102,7 @@ else:
 
 print(f"Workspace: {w.config.host}")
 print(f"Catalog:   {CATALOG}.{SCHEMA}")
-print(f"VS:        {VS_ENDPOINT}  |  Admin group: {ADMIN_GROUP}")
+print(f"VS:        {VS_ENDPOINT}")
 print("Scenario:  General Motors dealer service assistant")
 
 # COMMAND ----------
@@ -440,7 +450,7 @@ spark.sql(f"""
       ro_identifier STRING COMMENT 'A repair order number (e.g. RO-10001) or a customer email address'
     )
     RETURNS STRING
-    COMMENT 'Look up a service repair order by RO number or customer email. Returns service status, vehicle, VIN, service date, service type, cost, and the customer email and address. Customer PII (email, address) is protected by a Unity Catalog column mask, so values are redacted unless the caller is authorized.'
+    COMMENT 'Look up a service repair order by RO number or customer email. Returns service status, vehicle, VIN, service date, service type, cost, and the customer email and address. Customer PII (email, address) is protected by a Unity Catalog ABAC column-mask policy, so these values may be redacted depending on the caller''s identity.'
     RETURN (
       SELECT CONCAT_WS('\\n',
           CONCAT('Repair order: ', ro_number), CONCAT('Status: ', status),
@@ -492,31 +502,56 @@ print("  Permissions granted.")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 8 — Governance: UC column mask on `repair_orders` PII
-# MAGIC Members of the admin group see real PII; everyone else (incl. ephemeral lab users and the
-# MAGIC app service principal) sees `***REDACTED***`. This is the on-behalf-of-user story Module 3 teaches.
+# MAGIC ## Step 8 — Governance: ABAC column-mask **policy** on `repair_orders` PII
+# MAGIC PII is redacted by an **attribute-based access control (ABAC)** policy, not a hard-wired column
+# MAGIC mask. Two things make this the on-behalf-of-user story Module 3 teaches — and let the presenter
+# MAGIC rehearse it:
 # MAGIC
-# MAGIC `mask_pii` lives in a separate **`governance`** schema (NOT `shared`) so it does not surface as
-# MAGIC a tool on the agent's functions MCP server (which is scoped to `shared`). UC allows a column
-# MAGIC mask to reference a function in another schema by fully-qualified name.
+# MAGIC - **System governed tags** — we tag the PII columns with Databricks' **predefined** `class.*`
+# MAGIC   classification tags (`class.email_address`, `class.location`). Because they're *system* tags,
+# MAGIC   no governed-tag **creation** (an account-admin privilege) is needed — we just assign them. The
+# MAGIC   policy then matches columns **by tag** (`has_tag(...)`), so it's declarative and reusable.
+# MAGIC - **Named principals** — the policy masks an **explicit list** of principals (its `TO` clause),
+# MAGIC   which always includes **whoever runs this setup**. ABAC evaluates the *querying* identity and
+# MAGIC   does **not** exempt table owners or admins, so the presenter is masked exactly like a student —
+# MAGIC   they can run the whole demo seeing `***REDACTED***`. Add attendee principals via the
+# MAGIC   `masked_principals` widget. **Any identity not in the list sees the raw values.**
+# MAGIC
+# MAGIC The mask fn `mask_pii` is now a **pure redactor** — the who-is-exempt logic moved out of the
+# MAGIC function and into the policy's `TO` clause. It still lives in a separate **`governance`** schema
+# MAGIC (NOT `shared`) so it doesn't surface as a tool on the agent's functions MCP server (scoped to
+# MAGIC `shared`). ABAC requires serverless or DBR 16.4+ (this notebook runs on serverless).
 
 # COMMAND ----------
 
 GOV_SCHEMA = "governance"
+POLICY_NAME = "mask_repair_orders_pii"
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS `{CATALOG}`.`{GOV_SCHEMA}`")
+
+orders_t = _fqn("repair_orders")
+
+# Migration: drop any legacy hard-wired column MASK from the previous (non-ABAC) implementation FIRST —
+# while it's applied it references the old mask fn, so CREATE OR REPLACE FUNCTION below would fail on a
+# re-run against an already-provisioned workspace. No-op (swallowed) on a clean metastore.
+for col in PII_COLUMN_TAGS:
+    try:
+        spark.sql(f"ALTER TABLE {orders_t} ALTER COLUMN `{col}` DROP MASK")
+        print(f"  Dropped legacy SET MASK on repair_orders.{col}")
+    except Exception:
+        pass
+
+# Pure redactor — with ABAC, WHO is masked is decided by the policy's TO list, not by logic inside
+# the function. Return type (STRING) is castable to the STRING columns it masks.
 mask_fn = f"`{CATALOG}`.`{GOV_SCHEMA}`.`mask_pii`"
 spark.sql(f"""
     CREATE OR REPLACE FUNCTION {mask_fn}(val STRING)
     RETURNS STRING
-    COMMENT 'Masks customer PII for anyone who is not a member of the workshop admin group.'
-    RETURN CASE
-        WHEN is_account_group_member('{ADMIN_GROUP}') OR is_member('{ADMIN_GROUP}') THEN val
-        ELSE '***REDACTED***'
-    END
+    COMMENT 'Redacts customer PII. Applied via an ABAC column-mask policy; the policy TO-list decides who it fires for.'
+    RETURN '***REDACTED***'
 """)
-print(f"  Created masking function {mask_fn} (unmasked for group '{ADMIN_GROUP}')")
+print(f"  Created masking function {mask_fn} (pure redactor)")
 
-# Readers must be able to resolve + execute the mask fn when they query repair_orders.
+# Readers must be able to resolve + execute the mask fn when the policy fires on their query.
 for stmt in [
     f"GRANT USE SCHEMA ON SCHEMA `{CATALOG}`.`{GOV_SCHEMA}` TO `account users`",
     f"GRANT EXECUTE ON FUNCTION {mask_fn} TO `account users`",
@@ -526,18 +561,49 @@ for stmt in [
     except Exception as e:
         print(f"  Grant skipped (non-fatal): {e}")
 
-orders_t = _fqn("repair_orders")
-for col in PII_COLUMNS:
-    try:
-        spark.sql(f"ALTER TABLE {orders_t} ALTER COLUMN `{col}` SET MASK {mask_fn}")
-        print(f"  Applied mask to repair_orders.{col}")
-    except Exception as e:
-        if "already" in str(e).lower() or "mask" in str(e).lower():
-            print(f"  Mask on repair_orders.{col} already applied — skipping")
-        else:
-            print(f"  Could not apply mask to repair_orders.{col}: {e}")
+# The masked set = whoever runs setup (so the presenter sees the student view) + any principals named
+# in the widget. De-duped, order-preserving.
+try:
+    _runner = spark.sql("SELECT current_user()").collect()[0][0]
+except Exception:
+    _runner = None
+masked_set = list(dict.fromkeys(([_runner] if _runner else []) + MASKED_PRINCIPALS))
+to_clause = ", ".join(f"`{p}`" for p in masked_set)
 
-print(f"  Governance configured: repair_orders PII masked for non-'{ADMIN_GROUP}' identities.")
+# Assign each PII column its system class.* governed tag (idempotent — SET TAGS overwrites). We use a
+# key-only tag (empty value); the policy matches on tag presence via has_tag().
+for col, tag in PII_COLUMN_TAGS.items():
+    try:
+        spark.sql(f"ALTER TABLE {orders_t} ALTER COLUMN `{col}` SET TAGS ('{tag}' = '')")
+        print(f"  Tagged repair_orders.{col} with system tag {tag}")
+    except Exception as e:
+        print(f"  Could not tag repair_orders.{col} with {tag}: {e}")
+
+# Column-mask policy: match the class.*-tagged columns and redact them for the named principals only.
+# ABAC does not exempt owners/admins, so the running identity in `to_clause` really is masked.
+_tag_match = " OR ".join(f"has_tag('{t}')" for t in dict.fromkeys(PII_COLUMN_TAGS.values()))
+if to_clause:
+    try:
+        spark.sql(f"""
+            CREATE OR REPLACE POLICY `{POLICY_NAME}`
+            ON SCHEMA `{CATALOG}`.`{SCHEMA}`
+            COMMENT 'Redacts repair_orders customer PII for an explicit set of principals (matched by system class.* tags).'
+            COLUMN MASK {mask_fn}
+            TO {to_clause}
+            FOR TABLES
+            MATCH COLUMNS ({_tag_match}) AS pii
+            ON COLUMN pii
+        """)
+        print(f"  Created ABAC policy {POLICY_NAME} — masks PII for: {', '.join(masked_set)}")
+    except Exception as e:
+        print(f"  *** Could not create ABAC policy {POLICY_NAME} "
+              f"(non-fatal — check ABAC availability / MANAGE on schema): {e}")
+else:
+    print(f"  *** Skipped ABAC policy {POLICY_NAME}: no principals resolved to mask "
+          "(current_user unresolved and masked_principals widget empty).")
+
+print(f"  Governance configured: repair_orders PII redacted by ABAC policy for "
+      f"{len(masked_set)} named principal(s); all other identities see raw values.")
 
 # COMMAND ----------
 
@@ -706,7 +772,7 @@ except Exception as e:
 # MAGIC %md
 # MAGIC ## Step 11 — Unity AI Gateway model service (workshop-owned) on GPT-5.4
 # MAGIC The one service-principal call the agent makes is the **LLM**. We govern that model path with
-# MAGIC **Unity AI Gateway** — the counterpart to the OBO + UC column mask on the *data* path — by
+# MAGIC **Unity AI Gateway** — the counterpart to the OBO + ABAC column-mask policy on the *data* path — by
 # MAGIC creating our **own model service** in `agent_apps_workshop.shared` (a UC securable), rather than
 # MAGIC leaning on the shared/legacy `databricks-gpt-5-4` system endpoint. Via
 # MAGIC `POST /api/2.1/unity-catalog/model-services`:
@@ -725,7 +791,7 @@ except Exception as e:
 # MAGIC **On guardrails (PII/safety): intentionally NOT enabled.** They *gate* the chat and collide with
 # MAGIC this streaming app three ways — (1) **output guardrails are unsupported in streaming mode** (they
 # MAGIC break the streamed reply + Lakebase memory); (2) the **output PII guardrail blocks the
-# MAGIC repair-order lookup**, whose PII is already governed per-identity by the UC column mask (Module 3);
+# MAGIC repair-order lookup**, whose PII is already governed per-identity by the ABAC column-mask policy (Module 3);
 # MAGIC (3) the **safety guardrail false-positives** on benign questions, returning a 400 the app surfaces
 # MAGIC as a 500. So guardrails are a **Module 6** topic, not enabled here.
 # MAGIC
@@ -746,7 +812,7 @@ gateway_configured = False
 # NOTE — deliberately NO guardrails. AI Gateway guardrails GATE the chat and conflict with this
 # streaming agent app: output guardrails are unsupported in streaming mode (break the streamed reply
 # + Lakebase memory), the output PII guardrail blocks the repair-order lookup (PII already governed
-# per-identity by the UC column mask), and the safety guardrail false-positives on benign questions
+# per-identity by the ABAC column-mask policy), and the safety guardrail false-positives on benign questions
 # (400 -> the app's 500). Guardrails are a Module 6 topic. We enable transparent, non-gating
 # governance: one pay-per-token GPT-5.4 destination + an inference table in our own schema.
 _ms_body = {
@@ -1058,7 +1124,7 @@ print(f"  Scenario:   General Motors dealer service assistant")
 print(f"  Catalog:    {CATALOG}")
 print(f"  Schema:     {CATALOG}.{SCHEMA}  (vehicles, repair_orders, policies, vehicle_docs)")
 print(f"  VS Index:   {CATALOG}.{SCHEMA}.vehicle_docs_vs")
-print(f"  Admin grp:  {ADMIN_GROUP} (unmasked PII)")
+print(f"  PII mask:   ABAC policy '{POLICY_NAME}' -> {len(masked_set)} named principal(s) masked; other identities see raw")
 print(f"  Tools:      {CATALOG}.{SCHEMA}.{{get_vehicle_details, get_service_status, get_warranty_policy}}")
 print(f"  Warehouse:  {getattr(shared_wh, 'name', 'pending')} "
       f"({getattr(shared_wh, 'id', '?')}, CAN_USE for all users)")

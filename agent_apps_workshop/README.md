@@ -14,8 +14,8 @@ loop, in one sitting.
 **The platform story:** custom agents on **Databricks Apps** · **OpenAI Agents SDK** harness ·
 tools via **UC Functions + Vector Search, all running on-behalf-of-user (OBO)** · conversation
 memory in **Lakebase** (managed Postgres) · LLM via **Foundation Model APIs** (`databricks-gpt-5`,
-swappable in `app.yaml`) governed by **Unity AI Gateway** · governance via **OBO + UC column masks**
-(data path) and **Unity AI Gateway** inference-table logging + usage/rate limits (model path) ·
+swappable in `app.yaml`) governed by **Unity AI Gateway** · governance via **OBO + a UC ABAC
+column-mask policy** (data path) and **Unity AI Gateway** inference-table logging + usage/rate limits (model path) ·
 observability via **MLflow 3 tracing & evaluation**.
 
 ---
@@ -25,9 +25,9 @@ observability via **MLflow 3 tracing & evaluation**.
 | # | Module | The beat |
 |---|--------|----------|
 | 0 | **Meet Genie Code** | Attach `LAB_CONTEXT.md`; the in-workspace coding agent becomes your pair |
-| 1 | **Explore the data** | A live UC **column mask** redacts repair-order PII *for you specifically*; the vehicle brochures look… off |
+| 1 | **Explore the data** | A live UC **ABAC column-mask policy** redacts repair-order PII *for you specifically* (you're a named principal); the vehicle brochures look… off |
 | 2 | **Build & deploy** | One plain-English prompt → Genie deploys your own app (`sql` + `vector-search` scopes + a `postgres` memory resource, **zero SP grants on the data**) |
-| 3 | **Govern with OBO** | The same column mask follows your identity *through the deployed app* — plus **Unity AI Gateway** governs the model call. Governance you didn't build |
+| 3 | **Govern with OBO** | The same ABAC mask policy follows your identity *through the deployed app* — plus **Unity AI Gateway** governs the model call. Governance you didn't build |
 | 4 | **Break it** | Chat with the agent and surface the planted quality bugs (the Escalade warranty answer is the star) |
 | 5 | **Evaluate & fix** | 8-question eval, **6 MLflow LLM judges** → baseline fails → fix the prompt → score flips → then a **5-model axis** ("evaluate before you swap") |
 | 5½ | **Visit the memory** | Query your own chat transcript out of Lakebase (Postgres) — and the app's **≡ Journal** reads the same tables |
@@ -39,11 +39,11 @@ observability via **MLflow 3 tracing & evaluation**.
 
 - **All-OBO data access.** Every tool (UC function calls, Vector Search) runs as the *signed-in
   user* via the app's forwarded token — so the app's service principal needs **no grants** on the
-  shared data, and Unity Catalog governance (the PII column mask) follows the user automatically.
+  shared data, and Unity Catalog governance (the PII ABAC column-mask policy) follows the user automatically.
   The LLM runs as the app SP on Foundation Model APIs (pay-per-token, no grant).
 - **The model path is governed too — by Unity AI Gateway.** The agent's serving endpoint is
   configured with inference-table payload logging, usage tracking, and a rate limit — all in Unity
-  Catalog. So *both* paths are governed: data via OBO + UC masks, model via Unity AI Gateway.
+  Catalog. So *both* paths are governed: data via OBO + the ABAC column-mask policy, model via Unity AI Gateway.
   (Gateway *guardrails* — PII/safety — are intentionally left off: they gate the chat and break a
   streaming agent, so they're a Module 6 topic. See setup Step 11.)
 - **Conversation memory in Lakebase.** The app is created with a `postgres` resource; transcripts
@@ -59,7 +59,7 @@ observability via **MLflow 3 tracing & evaluation**.
   catalog, so the agent falls back to the lying brochure and reliably flips ❌→✅ after the prompt fix.
   The **availability** one is the *control*: availability **is** in the catalog, so the agent already
   answers it correctly (`availability_accuracy` is green on both runs). Module 5 adds more risks —
-  **PII disclosure** under pressure (the fix flips it), **fabrication** for a car not in the catalog,
+  **PII disclosure** under pressure (the ABAC mask already protects masked principals; the fix adds an explicit refusal), **fabrication** for a car not in the catalog,
   and an **over-permissive loyalty policy** the models largely *resist* (the cheap model on the model
   axis is the wobbly one — capability buys reliability). A good agent trusts the authoritative
   catalog/policy over marketing prose; the evals measure exactly which source it used, across models.
@@ -110,8 +110,13 @@ agent_apps_workshop/
 Run **`agent_apps_setup/agent_apps_setup.py`** as a workspace admin. It creates the shared catalog
 `agent_apps_workshop.shared` (GM vehicle/service tables + the planted quality issues), the
 `vehicle_docs_vs` Vector Search index, the three UC function tools, a shared SQL warehouse, the
-Lakebase memory project, the governance (PII column mask + grants), the **Unity AI Gateway** config
+Lakebase memory project, the governance (PII ABAC column-mask policy + system `class.*` tags + grants), the **Unity AI Gateway** config
 on the LLM endpoint, and deploys the shared **lab-guide app**.
+
+> **Set who sees masked PII.** The ABAC policy `mask_repair_orders_pii` redacts `repair_orders` PII
+> for an **explicit list of principals** — whoever runs setup is auto-included, so you experience the
+> student (redacted) view. For a class, pass every attendee's lab login to the **`masked_principals`**
+> widget; any identity not listed sees the raw values.
 
 ### 2. Give each participant the lab content
 Copy `agent_apps_lab/` into each participant's workspace home. They start at **`00_Start_Here`**.

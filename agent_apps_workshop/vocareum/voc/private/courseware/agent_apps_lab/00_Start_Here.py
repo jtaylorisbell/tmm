@@ -112,7 +112,7 @@ if GUIDE_URL:
 # MAGIC |---|---|---|
 # MAGIC | 1 | **Explore the data** | Browse `agent_apps_workshop.shared` — notice some odd vehicle brochures. Open `01_Explore_Data`. |
 # MAGIC | 2 | **Build & deploy the agent** | Direct Genie Code to deploy the `agent/` starter as your own **Databricks App** — its tools run **on-behalf-of-you (OBO)**. (Fallback: **`02_Deploy_App`** → Run All.) |
-# MAGIC | 3 | **Govern with OBO** | Because your agent runs **on-behalf-of-you**, the UC **column mask** auto-redacts customer PII in the repair-order lookup for non-admins — see it live. Plus **Unity AI Gateway** governs the model call. |
+# MAGIC | 3 | **Govern with OBO** | Because your agent runs **on-behalf-of-you**, the UC **ABAC column-mask policy** auto-redacts customer PII in the repair-order lookup — see it live. Plus **Unity AI Gateway** governs the model call. |
 # MAGIC | 4 | **Break it** | Chat with your agent and surface the planted quality bugs. |
 # MAGIC | 5 | **Evaluate & fix** | Open **`05_Evaluate_and_Fix`** (ready to run) — **6 MLflow LLM judges** → baseline → fix the prompt → re-eval → **prove** the gain → then a **5-model axis** (evaluate before you swap). |
 # MAGIC | 5½ | **Visit your agent's memory** | **Compute → Lakebase → Open Lakebase** → project "Agent Apps Workshop Memory" → SQL Editor → query `agent_messages` in **your app's schema** (printed above) — every chat is there. |

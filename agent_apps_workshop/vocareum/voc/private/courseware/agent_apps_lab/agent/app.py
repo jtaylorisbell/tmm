@@ -2,11 +2,11 @@
 
 Every DATA call (UC function tools, Vector Search) runs **on-behalf-of the signed-in user** via
 the `X-Forwarded-Access-Token` header — the app's service principal is granted NOTHING on the
-shared data, and UC governance (the PII column mask) follows the user automatically. The LLM
+shared data, and UC governance (the PII ABAC column-mask policy) follows the user automatically. The LLM
 runs as the app SP via Foundation Model APIs (pay-per-token, no grant); the call is **routed through
 Unity AI Gateway** (base_url `{host}/ai-gateway/openai/v1`, not the legacy `/serving-endpoints`
 route) — inference-table payload logging, usage tracking, and a rate limit, all in Unity Catalog:
-the model path's counterpart to the OBO + UC mask on the data path. (Gateway *guardrails* are left
+the model path's counterpart to the OBO + ABAC column-mask policy on the data path. (Gateway *guardrails* are left
 off: they gate the chat and break a streaming agent — a Module 6 topic — see workshop setup Step 11.)
 
 Conversation memory: the app is created with a **`postgres` resource** (the shared Lakebase
@@ -138,8 +138,8 @@ def get_warranty_policy(topic: str = "") -> str:
 @function_tool
 def get_service_status(ro_identifier: str) -> str:
     """Look up a service repair order by RO number (e.g. RO-10001) or customer email. Customer PII
-    is column-masked by Unity Catalog and — because this runs on-behalf-of-the-user — is redacted
-    unless the signed-in user is a workshop admin."""
+    is protected by a Unity Catalog ABAC column-mask policy and — because this runs
+    on-behalf-of-the-user — is redacted unless the signed-in user's identity is outside the policy."""
     return _run_sql(
         f"SELECT {CATALOG}.{SCHEMA}.get_service_status(:a) AS r",
         [StatementParameterListItem(name="a", value=ro_identifier)],

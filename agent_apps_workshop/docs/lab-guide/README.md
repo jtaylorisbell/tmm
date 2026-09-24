@@ -11,7 +11,7 @@ with LLM judges, **fix** it, and **prove** the fix — the full agent-hardening 
 
 **Already set up for you** (shared, in catalog `agent_apps_workshop.shared`): the GM tables
 (`vehicles`, `repair_orders`, `policies`, `vehicle_docs`), a Vector Search index, three UC function
-tools, a SQL warehouse, a PII column mask, a **Lakebase** project for agent memory, and a **Unity AI
+tools, a SQL warehouse, a PII ABAC column-mask policy, a **Lakebase** project for agent memory, and a **Unity AI
 Gateway**-governed LLM endpoint. **Your** home folder has `agent_apps_lab/` with the lab notebooks, a
 ready-to-run `agent/` starter, and `LAB_CONTEXT.md`.
 
@@ -43,7 +43,8 @@ ready-to-run `agent/` starter, and `LAB_CONTEXT.md`.
 Open **`agent_apps_lab/01_Explore_Data`** and run it top to bottom. Two things to notice:
 
 - **Governance is live:** in `repair_orders`, customer **email and address show `***REDACTED***`** —
-  a Unity Catalog **column mask**, applied to you as a non-admin. (Admins see real values.)
+  a Unity Catalog **ABAC column-mask policy**, evaluated against *your* identity. Nobody wrote
+  per-user code; the policy matches the column by a system data-classification tag.
 
   ![Repair orders with masked PII](img/01-explore-orders-masked.png)
 
@@ -100,7 +101,7 @@ def build_agent() -> Agent:
 - **The instructions are deliberately bare** — no source-of-truth rules. Module 5 *measures* what
   that costs; the fix is an edit to exactly this string. **Peek, don't edit yet.**
 - **A tool is just a decorated Python function** running with *your* forwarded token — that's why
-  the PII mask follows you through the app.
+  the PII ABAC policy follows you through the app.
 - **The model is one env var** (`LLM_ENDPOINT` in `app.yaml`), and that endpoint is governed by
   **Unity AI Gateway** — swapping models is a one-line change, but evaluate first (Module 6).
 
@@ -131,8 +132,8 @@ In the chat UI, replies **stream in live** — and each 🔧 tool call prints as
 
    > *"What's the status of repair order RO-10001? Include the customer's email and address."*
 
-   The repair order comes back with **email and address redacted** — the same column mask from
-   Module 1, following your identity through the deployed app. **Governance you didn't build.**
+   The repair order comes back with **email and address redacted** — the same ABAC column-mask
+   policy from Module 1, following your identity through the deployed app. **Governance you didn't build.**
    (Note the header's **acting as:** line and the 🔧 **tool-call chips** — the app layer showing
    you exactly what the agent did, as whom.)
 
@@ -141,9 +142,9 @@ In the chat UI, replies **stream in live** — and each 🔧 tool call prints as
 3. **The model call is governed too.** Your agent's LLM endpoint runs behind **Unity AI Gateway** —
    every request/response is logged to a Unity Catalog inference table (an audit trail of exactly what
    the model saw and said), and usage is tracked and rate-limited for cost control. Two paths, both
-   governed in Unity Catalog: your **data** via OBO + the column mask, your **model** via Unity AI
-   Gateway. *(Gateway can also enforce PII/safety **guardrails**, but those gate the chat and don't
-   fit a streaming assistant that legitimately returns admin-visible PII — so guardrails are a
+   governed in Unity Catalog: your **data** via OBO + the ABAC column-mask policy, your **model** via
+   Unity AI Gateway. *(Gateway can also enforce PII/safety **guardrails**, but those gate the chat and
+   don't fit a streaming assistant that legitimately returns identity-scoped PII — so guardrails are a
    Module 6 topic, not enabled here.)*
 
 4. **It remembers.** Ask *"and what was the total on that repair?"* — the header shows your session id,
@@ -186,7 +187,7 @@ lesson** — an agent is only as good as *which source it trusts*. Gut feel says
    | judge | baseline | fixed | what it catches |
    |---|---|---|---|
    | **warranty_accuracy** | **0.88 ❌** | **1.0 ✅** | the 6-year brochure lie |
-   | **pii_protected** | **0.88 ❌** | **1.0 ✅** | reading back a customer's email/address |
+   | **pii_protected** | **0.88 ❌** *(unmasked)* | **1.0 ✅** | reading back a customer's email/address |
    | **no_fabrication** | 0.75–1.0 | 1.0 | inventing specs for a car we don't sell |
    | availability_accuracy | 1.0 | 1.0 | discontinued Camaro (catalog protects) |
    | coverage_reasoning | 1.0 | 1.0 | "will I be charged?" (recall = free) |
@@ -194,16 +195,17 @@ lesson** — an agent is only as good as *which source it trusts*. Gut feel says
 
    ![MLflow evaluation runs: baseline vs fixed](img/08-eval-baseline-vs-fixed.png)
 
-   The "fix" is a **prompt change** — **warranty** and **pii_protected** flip ❌→✅ with per-row
-   answers and judge rationales as **real traces**. The green controls prove behavior you can't
+   The "fix" is a **prompt change** — **warranty** flips ❌→✅ (and **pii_protected** too, for any
+   caller who can see raw PII) with per-row answers and judge rationales as **real traces**. The green controls prove behavior you can't
    eyeball: the catalog protects availability, and the recall-coverage question reasons correctly.
 
    > \* **`policy_grounded`** is usually green — the models *resist* the planted over-permissive
    > "loyalty goodwill" policy (good!). That's a real lesson: bad data in your knowledge base is a
    > latent risk, but a capable, well-instructed agent cross-references the official policy. Watch the
-   > **cheap model** wobble on it in step 4. **`pii_protected`** only fails at baseline if you're a
-   > workspace **admin** (the column mask exempts you); as a non-admin the mask redacts the data so the
-   > agent literally can't leak it — governance you didn't build.
+   > **cheap model** wobble on it in step 4. **`pii_protected`** only fails at baseline for a caller who
+   > sees **raw** PII (an identity the ABAC policy doesn't cover); because the policy redacts *your*
+   > data, the agent literally can't leak it — so for you it passes at baseline as governance you
+   > didn't build.
 
 3. **Make it yours (optional):** edit `fixed_instructions`, re-run, then ask Genie to *"update
    the agent instructions to the fixed version and redeploy"* — your app now answers **3 years /
